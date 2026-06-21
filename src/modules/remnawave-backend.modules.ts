@@ -30,6 +30,7 @@ import { UsersModule } from './users/users.module';
 import { AdminModule } from './admin/admin.module';
 import { NodePluginModule } from './node-plugins';
 import { AuthModule } from './auth/auth.module';
+import { TrafficAuditModule } from './traffic-audit/traffic-audit.module';
 
 @Module({
     imports: [
@@ -60,6 +61,7 @@ import { AuthModule } from './auth/auth.module';
         ConditionalModule.registerWhen(RemnawaveServiceModule, () => isScheduler()),
         ConditionalModule.registerWhen(IpControlModule, () => isRestApi()),
         ConditionalModule.registerWhen(MetadataModule, () => isRestApi()),
+        TrafficAuditModule
     ],
 })
 export class RemnawaveModules {}
