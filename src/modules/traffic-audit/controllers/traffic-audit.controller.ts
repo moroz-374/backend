@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 
 import { Roles } from '@common/decorators/roles/roles';
 import { JwtDefaultGuard } from '@common/guards/jwt-guards/def-jwt-guard';
@@ -7,6 +7,7 @@ import { ROLE } from '@libs/contracts/constants';
 
 import { UpdateTrafficAuditDto } from '../dtos/update-traffic-audit.dto';
 import { TrafficAuditService } from '../traffic-audit.service';
+import { GetTrafficLogsDto } from '../dtos/get-traffic-logs.dto';
 
 @Roles(ROLE.ADMIN, ROLE.API)
 @UseGuards(JwtDefaultGuard, RolesGuard)
@@ -20,4 +21,12 @@ export class TrafficAuditController {
             response: await this.trafficAuditService.updateAuditFlag(userUuid, body.enabled),
         };
     }
+
+    @Get('logs')
+    public async getLogs(@Param('uuid') userUuid: string, @Query() query: GetTrafficLogsDto) {
+        return {
+            response: await this.trafficAuditService.getUserLogs(userUuid, query),
+        };
+    }
+
 }
