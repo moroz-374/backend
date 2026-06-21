@@ -1,6 +1,7 @@
 import {Injectable, NotFoundException} from '@nestjs/common';
 
 import {PrismaService} from '@common/database/prisma.service';
+import { IngestTrafficLogsDto } from './dtos/ingest-traffic-logs.dto';
 
 @Injectable()
 export class TrafficAuditService {
@@ -71,4 +72,81 @@ export class TrafficAuditService {
         };
     }
 
+    public async ingest(body: IngestTrafficLogsDto) {
+        const identifiers = [...new Set(body.events.map((event) => event.clientIdentifier))];
+
+        const auditedUsers = await this.prisma.users.findMany({
+            where: {
+                isAuditEnabled: true,
+                OR: [
+                    {
+                        email: {
+                            in: identifiers,
+                        },
+                    },
+                    {
+                        username: {
+                            in: identifiers,
+                        },
+                    },
+                    {
+                        uuid: {
+                            in: identifiers,
+                        },
+                    },
+                ],
+            },
+            select: {
+                tId: true,
+                email: true,
+                username: true,
+                uuid: true,
+            },
+        });
+
+        const identifierToUserId = new Map<string, bigint>();
+
+        for (const user of auditedUsers) {
+            if (user.email) {
+                identifierToUserId.set(user.email, user.tId);
+            }
+
+            identifierToUserId.set(user.username, user.tId);
+            identifierToUserId.set(user.uuid, user.tId);
+        }
+
+        const logsToInsert = body.events.flatMap((event) => {
+            const userId = identifierToUserId.get(event.clientIdentifier);
+
+            if (!userId) {
+                return [];
+            }
+
+            return [
+                {
+                    eventId: event.eventId,
+                    userId,
+                    nodeUuid: body.nodeUuid,
+                    destination: event.destination.trim().toLowerCase().replace(/\.$/, ''),
+                    destinationType: event.destinationType,
+                    network: event.network,
+                    port: event.port,
+                    requestedAt: new Date(event.requestedAt),
+                    clientIdentifier: event.clientIdentifier,
+                },
+            ];
+        });
+
+        const result = await this.prisma.trafficLog.createMany({
+            data: logsToInsert,
+            skipDuplicates: true,
+        });
+
+        return {
+            received: body.events.length,
+            accepted: logsToInsert.length,
+            inserted: result.count,
+            discarded: body.events.length - logsToInsert.length,
+        };
+    }
 }
