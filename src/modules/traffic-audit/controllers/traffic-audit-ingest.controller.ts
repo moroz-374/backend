@@ -1,8 +1,10 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
 
 import { IngestTrafficLogsDto } from '../dtos/ingest-traffic-logs.dto';
 import { TrafficAuditService } from '../traffic-audit.service';
+import { TrafficAuditIngestTokenGuard } from '../guards/traffic-audit-ingest-token.guard';
 
+@UseGuards(TrafficAuditIngestTokenGuard)
 @Controller('api/monitoring')
 export class TrafficAuditIngestController {
     constructor(private readonly trafficAuditService: TrafficAuditService) {}
