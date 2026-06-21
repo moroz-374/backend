@@ -67,6 +67,7 @@ model Users {
   hwidDeviceLimit        Int?      @map("hwid_device_limit")
   externalSquadUuid      String?   @map("external_squad_uuid") @db.Uuid
   lastTriggeredThreshold Int       @default(0) @map("last_triggered_threshold")
+  isAuditEnabled         Boolean   @default(false) @map("is_audit_enabled")
 
   createdAt DateTime @default(dbgenerated("now()")) @map("created_at")
   updatedAt DateTime @default(dbgenerated("now()")) @updatedAt @map("updated_at")
@@ -78,6 +79,7 @@ model Users {
   userMetas                      UserMeta[]
   torrentBlockerReports          TorrentBlockerReports[]
   traffic                        UserTraffic?
+  trafficLogs                    TrafficLog[]
 
   externalSquad ExternalSquads? @relation(fields: [externalSquadUuid], references: [uuid], onDelete: SetNull)
 
@@ -204,6 +206,7 @@ model Nodes {
   connectedUsers               UserTraffic[]
   nodeMetas                    NodeMeta[]
   torrentBlockerReports        TorrentBlockerReports[]
+  trafficLogs                  TrafficLog[]
 
   activeConfigProfile ConfigProfiles? @relation(fields: [activeConfigProfileUuid], references: [uuid], onDelete: SetNull)
   provider            InfraProviders? @relation(fields: [providerUuid], references: [uuid], onDelete: SetNull)
@@ -631,4 +634,32 @@ model TorrentBlockerReports {
   node Nodes @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
   @@map("torrent_blocker_reports")
+}
+
+model TrafficLog {
+  id BigInt @id @default(autoincrement())
+
+  userId   BigInt @map("user_id")
+  nodeUuid String @map("node_uuid") @db.Uuid
+
+  destination     String @db.VarChar(253)
+  destinationType String @map("destination_type") @db.VarChar(10)
+
+  network String @db.VarChar(3)
+  port    Int
+
+  requestedAt      DateTime @map("requested_at") @db.Timestamptz(3)
+  clientIdentifier String   @map("client_identifier") @db.VarChar(255)
+
+  eventId String @unique @map("event_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user Users @relation(fields: [userId], references: [tId], onDelete: Cascade)
+  node Nodes @relation(fields: [nodeUuid], references: [uuid], onDelete: Cascade)
+
+  @@index([userId, requestedAt(sort: Desc)])
+  @@index([destination, requestedAt(sort: Desc)])
+  @@index([requestedAt])
+  @@map("traffic_logs")
 }

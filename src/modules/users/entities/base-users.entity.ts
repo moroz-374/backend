@@ -16,6 +16,7 @@ export class BaseUserEntity implements Users {
     public subRevokedAt: Date | null;
     public lastTrafficResetAt: Date | null;
     public lastTriggeredThreshold: number;
+    public isAuditEnabled: boolean;
 
     public trojanPassword: string;
     public vlessUuid: string;
