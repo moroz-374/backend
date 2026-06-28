@@ -15,6 +15,8 @@ export const NODES_ROUTES = {
         DISABLE: (uuid: string) => `${uuid}/${NODE_ACTIONS_ROUTE}/disable`,
         RESTART: (uuid: string) => `${uuid}/${NODE_ACTIONS_ROUTE}/restart`,
         RESET_TRAFFIC: (uuid: string) => `${uuid}/${NODE_ACTIONS_ROUTE}/reset-traffic`,
+        ROTATE_TRAFFIC_AUDIT_CREDENTIAL: (uuid: string) =>
+            `${uuid}/${NODE_ACTIONS_ROUTE}/rotate-traffic-audit-credential`,
 
         RESTART_ALL: `${NODE_ACTIONS_ROUTE}/restart-all`,
         REORDER: `${NODE_ACTIONS_ROUTE}/reorder`,

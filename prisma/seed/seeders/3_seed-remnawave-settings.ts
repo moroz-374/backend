@@ -8,6 +8,7 @@ import {
     TOauth2Settings,
     TPasswordAuthSettings,
     TRemnawavePasskeySettings,
+    TTrafficAuditSettings,
 } from '@libs/contracts/models';
 
 import { RemnawaveSettingsEntity } from '@modules/remnawave-settings/entities';
@@ -71,10 +72,15 @@ export async function seedRemnawaveSettings(prisma: PrismaClient) {
         enabled: true,
     };
 
+    const DEFAULT_TRAFFIC_AUDIT_SETTINGS: TTrafficAuditSettings = {
+        hideRules: [],
+    };
+
     const settingsMapping = {
         passkeySettings: DEFAULT_PASSKEY_SETTINGS,
         oauth2Settings: DEFAULT_OAUTH2_SETTINGS,
         passwordSettings: DEFAULT_PASSWORD_AUTH_SETTINGS,
+        trafficAuditSettings: DEFAULT_TRAFFIC_AUDIT_SETTINGS,
     };
 
     const DEFAULT_BRANDING_SETTINGS: TBrandingSettings = {
@@ -130,6 +136,7 @@ export async function seedRemnawaveSettings(prisma: PrismaClient) {
             oauth2Settings: DEFAULT_OAUTH2_SETTINGS,
             passwordSettings: DEFAULT_PASSWORD_AUTH_SETTINGS,
             brandingSettings: DEFAULT_BRANDING_SETTINGS,
+            trafficAuditSettings: DEFAULT_TRAFFIC_AUDIT_SETTINGS,
         });
 
         await prisma.remnawaveSettings.create({

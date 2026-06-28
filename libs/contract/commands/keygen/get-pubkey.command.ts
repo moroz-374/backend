@@ -15,6 +15,7 @@ export namespace GetPubKeyCommand {
     export const ResponseSchema = z.object({
         response: z.object({
             pubKey: z.string(),
+            trafficAuditCredential: z.string(),
         }),
     });
 

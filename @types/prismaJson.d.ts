@@ -5,6 +5,7 @@ import {
     PasskeySettingsSchema,
     PasswordAuthSettingsSchema,
     BrandingSettingsSchema,
+    TrafficAuditSettingsSchema,
 } from '@libs/contracts/models';
 
 declare global {
@@ -13,6 +14,7 @@ declare global {
         type Oauth2Settings = z.infer<typeof Oauth2SettingsSchema>;
         type PasswordAuthSettings = z.infer<typeof PasswordAuthSettingsSchema>;
         type BrandingSettings = z.infer<typeof BrandingSettingsSchema>;
+        type TrafficAuditSettings = z.infer<typeof TrafficAuditSettingsSchema>;
     }
 }
 

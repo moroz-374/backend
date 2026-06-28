@@ -3,6 +3,7 @@ import {
     TOauth2Settings,
     TPasswordAuthSettings,
     TRemnawavePasskeySettings,
+    TTrafficAuditSettings,
 } from '@libs/contracts/models';
 
 import { RemnawaveSettingsEntity } from '../entities';
@@ -12,11 +13,13 @@ export class RemnawaveSettingsResponseModel {
     public oauth2Settings: TOauth2Settings;
     public passwordSettings: TPasswordAuthSettings;
     public brandingSettings: TBrandingSettings;
+    public trafficAuditSettings: TTrafficAuditSettings;
 
     constructor(entity: RemnawaveSettingsEntity) {
         this.passkeySettings = entity.passkeySettings;
         this.oauth2Settings = entity.oauth2Settings;
         this.passwordSettings = entity.passwordSettings;
         this.brandingSettings = entity.brandingSettings;
+        this.trafficAuditSettings = entity.trafficAuditSettings;
     }
 }

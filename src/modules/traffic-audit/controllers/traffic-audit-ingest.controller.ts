@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
 
 import { TrafficAuditIngestTokenGuard } from '../guards/traffic-audit-ingest-token.guard';
 import { IngestTrafficLogsDto } from '../dtos/ingest-traffic-logs.dto';
@@ -11,9 +11,12 @@ export class TrafficAuditIngestController {
 
     @HttpCode(HttpStatus.OK)
     @Post('ingest')
-    public async ingest(@Body() body: IngestTrafficLogsDto) {
+    public async ingest(
+        @Body() body: IngestTrafficLogsDto,
+        @Req() request: { trafficAuditNodeUuid: string },
+    ) {
         return {
-            response: await this.trafficAuditService.ingest(body),
+            response: await this.trafficAuditService.ingest(request.trafficAuditNodeUuid, body),
         };
     }
 }

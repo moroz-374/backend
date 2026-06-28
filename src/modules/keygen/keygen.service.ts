@@ -7,14 +7,20 @@ import { ERRORS } from '@libs/contracts/constants/errors';
 
 import { KeygenRepository } from './repositories/keygen.repository';
 import { KeygenEntity } from './entities/keygen.entity';
+import { TrafficAuditCredentialService } from '@modules/traffic-audit/credentials';
 
 @Injectable()
 export class KeygenService {
     private readonly logger = new Logger(KeygenService.name);
 
-    constructor(private readonly keygenRepository: KeygenRepository) {}
+    constructor(
+        private readonly keygenRepository: KeygenRepository,
+        private readonly trafficAuditCredentials: TrafficAuditCredentialService,
+    ) {}
 
-    public async generateKey(): Promise<TResult<{ payload: string } & KeygenEntity>> {
+    public async generateKey(): Promise<
+        TResult<{ payload: string; trafficAuditCredential: string } & KeygenEntity>
+    > {
         try {
             const pubKey = await this.keygenRepository.findFirstByCriteria({});
 
@@ -35,7 +41,9 @@ export class KeygenService {
                 jwtPublicKey: pubKey.pubKey,
             });
 
-            return ok({ payload: nodePayload, ...pubKey });
+            const trafficAuditCredential = await this.trafficAuditCredentials.issueUnbound();
+
+            return ok({ payload: nodePayload, trafficAuditCredential, ...pubKey });
         } catch (error) {
             this.logger.error(error);
             return fail(ERRORS.GET_PUBLIC_KEY_ERROR);

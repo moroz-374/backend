@@ -1,4 +1,4 @@
-import { Controller, HttpStatus, UseFilters, UseGuards } from '@nestjs/common';
+import { Controller, Header, HttpStatus, UseFilters, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
 import { HttpExceptionFilter } from '@common/exception/http-exception.filter';
@@ -32,12 +32,13 @@ export class KeygenController {
         command: GetPubKeyCommand,
         httpCode: HttpStatus.OK,
     })
+    @Header('Cache-Control', 'no-store')
     async generateKey(): Promise<GetPubKeyResponseDto> {
         const result = await this.keygenService.generateKey();
 
         const data = errorHandler(result);
         return {
-            response: new KeygenResponseModel(data.payload),
+            response: new KeygenResponseModel(data.payload, data.trafficAuditCredential),
         };
     }
 }

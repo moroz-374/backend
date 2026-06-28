@@ -8,7 +8,7 @@ import {
     ApiParam,
     ApiTags,
 } from '@nestjs/swagger';
-import { Body, Controller, HttpStatus, Param, UseFilters, UseGuards } from '@nestjs/common';
+import { Body, Controller, Header, HttpStatus, Param, UseFilters, UseGuards } from '@nestjs/common';
 
 import { HttpExceptionFilter } from '@common/exception/http-exception.filter';
 import { JwtDefaultGuard } from '@common/guards/jwt-guards/def-jwt-guard';
@@ -32,6 +32,7 @@ import {
     UpdateNodeCommand,
     BulkNodesActionsCommand,
     BulkNodesUpdateCommand,
+    RotateTrafficAuditCredentialCommand,
 } from '@libs/contracts/commands';
 
 import {
@@ -52,6 +53,8 @@ import {
     GetOneNodeResponseDto,
     ProfileModificationRequestDto,
     ProfileModificationResponseDto,
+    RotateTrafficAuditCredentialRequestDto,
+    RotateTrafficAuditCredentialResponseDto,
     ReorderNodeRequestDto,
     ReorderNodeResponseDto,
     ResetNodeTrafficRequestDto,
@@ -107,6 +110,29 @@ export class NodesController {
         const data = errorHandler(result);
         return {
             response: data,
+        };
+    }
+
+    @ApiOkResponse({
+        type: RotateTrafficAuditCredentialResponseDto,
+        description: 'Traffic audit credential rotated',
+    })
+    @ApiParam({ name: 'uuid', type: String, description: 'Node UUID' })
+    @Endpoint({
+        command: RotateTrafficAuditCredentialCommand,
+        httpCode: HttpStatus.OK,
+    })
+    @Header('Cache-Control', 'no-store')
+    async rotateTrafficAuditCredential(
+        @Param() params: RotateTrafficAuditCredentialRequestDto,
+    ): Promise<RotateTrafficAuditCredentialResponseDto> {
+        const result = await this.nodesService.rotateTrafficAuditCredential(params.uuid);
+
+        return {
+            response: {
+                trafficAuditCredential: result.credential,
+                issuedAt: result.issuedAt.toISOString(),
+            },
         };
     }
 

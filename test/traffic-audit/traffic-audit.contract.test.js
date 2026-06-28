@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { randomUUID } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 const test = require('node:test');
 
 require('reflect-metadata');
@@ -23,9 +23,30 @@ const {
 const {
     TrafficAuditService,
 } = require('../../dist/src/modules/traffic-audit/traffic-audit.service');
+const {
+    getTrafficLogsSchema,
+} = require('../../dist/src/modules/traffic-audit/dtos/get-traffic-logs.dto');
+const {
+    TrafficAuditSettingsSchema,
+} = require('../../dist/libs/contract/models/remnawave-settings/traffic-audit-settings.schema');
+const {
+    decodeCursor,
+    globToRegex,
+} = require('../../dist/src/modules/traffic-audit/traffic-audit-clickhouse.service');
+const {
+    ingestTrafficLogsSchema,
+} = require('../../dist/src/modules/traffic-audit/dtos/ingest-traffic-logs.dto');
+const { GetPubKeyCommand } = require('../../dist/libs/contract/commands/keygen/get-pubkey.command');
+const { CreateNodeCommand } = require('../../dist/libs/contract/commands/nodes/create.command');
+const {
+    TrafficAuditCredentialService,
+} = require('../../dist/src/modules/traffic-audit/credentials/traffic-audit-credential.service');
 
 test('traffic audit controllers rely on the global /api prefix exactly once', () => {
-    assert.equal(Reflect.getMetadata(PATH_METADATA, TrafficAuditController), 'users/:uuid/traffic-audit');
+    assert.equal(
+        Reflect.getMetadata(PATH_METADATA, TrafficAuditController),
+        'users/:uuid/traffic-audit',
+    );
     assert.equal(Reflect.getMetadata(PATH_METADATA, TrafficAuditIngestController), 'monitoring');
 });
 
@@ -93,10 +114,13 @@ test('ingest rejects queued events captured before audit was enabled', async () 
         {
             insert: async (events) => inserted.push(...events),
         },
+        {
+            recordBatch() {},
+            recordClickhouseError() {},
+        },
     );
 
-    const result = await service.ingest({
-        nodeUuid: 'f817ba21-2931-41ec-a9bf-26c9543b6d77',
+    const result = await service.ingest('f817ba21-2931-41ec-a9bf-26c9543b6d77', {
         events: [
             {
                 eventId: randomUUID(),
@@ -117,12 +141,150 @@ test('ingest rejects queued events captured before audit was enabled', async () 
                 requestedAt: '2026-06-27T15:00:00.000Z',
             },
         ],
+        metrics: {
+            queueDepth: 0,
+            droppedEventsTotal: 0,
+            retryAttemptsTotal: 0,
+            lastSuccessfulDeliveryAt: null,
+        },
     });
 
     assert.equal(result.received, 2);
     assert.equal(result.inserted, 1);
     assert.equal(result.discarded, 1);
     assert.equal(inserted[0].destination, 'after.example.com');
+});
+
+test('traffic log filters reject malformed cursors and invalid bounds', () => {
+    assert.equal(getTrafficLogsSchema.safeParse({ cursor: '', limit: 10 }).success, false);
+    assert.equal(getTrafficLogsSchema.safeParse({ port: 0 }).success, false);
+    assert.equal(
+        getTrafficLogsSchema.safeParse({
+            from: '2026-06-29T00:00:00.000Z',
+            to: '2026-06-28T00:00:00.000Z',
+        }).success,
+        false,
+    );
+    assert.throws(() => decodeCursor('not-a-valid-cursor'), /Invalid traffic audit cursor/);
+});
+
+test('node provisioning contracts require a one-time traffic audit credential', () => {
+    assert.equal(
+        GetPubKeyCommand.ResponseSchema.safeParse({ response: { pubKey: 'secret-key' } }).success,
+        false,
+    );
+    assert.equal(
+        CreateNodeCommand.RequestSchema.shape.trafficAuditCredential.safeParse(
+            `${'a'.repeat(24)}.${'b'.repeat(43)}`,
+        ).success,
+        true,
+    );
+    const ingest = ingestTrafficLogsSchema.safeParse({
+        nodeUuid: randomUUID(),
+        events: [],
+        metrics: {},
+    });
+    assert.equal(ingest.success, false);
+    assert.equal('nodeUuid' in ingestTrafficLogsSchema.shape, false);
+});
+
+test('hide rules normalize domains and validate whole-string globs', () => {
+    const settings = TrafficAuditSettingsSchema.parse({
+        hideRules: [
+            { type: 'SUFFIX', pattern: 'Example.COM.' },
+            { type: 'GLOB', pattern: '*.internal?.example' },
+        ],
+    });
+
+    assert.equal(settings.hideRules[0].pattern, 'example.com');
+    assert.match('a.internal1.example', new RegExp(globToRegex(settings.hideRules[1].pattern)));
+    assert.doesNotMatch('prefix-a.internal1.example-suffix', new RegExp(globToRegex('a.*')));
+    assert.equal(
+        TrafficAuditSettingsSchema.safeParse({
+            hideRules: [{ type: 'GLOB', pattern: '***' }],
+        }).success,
+        false,
+    );
+});
+
+test('credential authentication rejects an invalid secret without trusting node identity', async () => {
+    const service = new TrafficAuditCredentialService(
+        {
+            trafficAuditCredentials: {
+                findUnique: async () => ({
+                    nodeUuid: 'f817ba21-2931-41ec-a9bf-26c9543b6d77',
+                    secretHash: '0'.repeat(64),
+                }),
+            },
+        },
+        {
+            get: async () => null,
+            set: async () => {},
+        },
+    );
+
+    await assert.rejects(
+        service.authenticate(`${'a'.repeat(24)}.${'b'.repeat(43)}`),
+        /Invalid traffic audit credential/,
+    );
+});
+
+test('credential rotation immediately revokes the cached old credential', async () => {
+    const nodeUuid = randomUUID();
+    const oldId = 'a'.repeat(24);
+    const oldSecret = 'b'.repeat(43);
+    const cache = new Map();
+    let stored = {
+        credentialId: oldId,
+        secretHash: createHash('sha256').update(oldSecret).digest('hex'),
+        nodeUuid,
+        issuedAt: new Date(),
+    };
+
+    const prisma = {
+        trafficAuditCredentials: {
+            findUnique: async ({ where }) => {
+                if (!stored) return null;
+                if (
+                    where.nodeUuid === stored.nodeUuid ||
+                    where.credentialId === stored.credentialId
+                ) {
+                    return stored;
+                }
+                return null;
+            },
+        },
+        nodes: {
+            findUnique: async ({ where }) => (where.uuid === nodeUuid ? { uuid: nodeUuid } : null),
+        },
+        $transaction: async (callback) =>
+            callback({
+                trafficAuditCredentials: {
+                    deleteMany: async () => {
+                        stored = null;
+                    },
+                    create: async ({ data }) => {
+                        stored = { ...data, issuedAt: new Date() };
+                        return { issuedAt: stored.issuedAt };
+                    },
+                },
+            }),
+    };
+    const service = new TrafficAuditCredentialService(prisma, {
+        get: async (key) => cache.get(key) ?? null,
+        set: async (key, value) => cache.set(key, value),
+        del: async (key) => cache.delete(key),
+    });
+
+    assert.equal(await service.authenticate(`${oldId}.${oldSecret}`), nodeUuid);
+    const rotated = await service.rotate(nodeUuid);
+
+    await assert.rejects(
+        service.authenticate(`${oldId}.${oldSecret}`),
+        /Invalid traffic audit credential/,
+    );
+    assert.equal(await service.authenticate(rotated.credential), nodeUuid);
+    assert.equal(rotated.credential.split('.').length, 2);
 });
 
 test(
@@ -139,6 +301,8 @@ test(
         const clickhouse = new TrafficAuditClickhouseService(config);
         const eventId = randomUUID();
         const userUuid = randomUUID();
+        const nodeUuid = randomUUID();
+        const now = Date.now();
 
         try {
             await clickhouse.onModuleInit();
@@ -147,12 +311,36 @@ test(
                     eventId,
                     userId: 1n,
                     userUuid,
-                    nodeUuid: randomUUID(),
+                    nodeUuid,
                     destination: 'integration.example.com',
                     destinationType: 'DOMAIN',
                     network: 'tcp',
                     port: 443,
-                    requestedAt: new Date(),
+                    requestedAt: new Date(now - 2_000),
+                    clientIdentifier: 'integration-user',
+                },
+                {
+                    eventId: randomUUID(),
+                    userId: 1n,
+                    userUuid,
+                    nodeUuid,
+                    destination: 'sub.noise.example.com',
+                    destinationType: 'DOMAIN',
+                    network: 'tcp',
+                    port: 443,
+                    requestedAt: new Date(now - 1_000),
+                    clientIdentifier: 'integration-user',
+                },
+                {
+                    eventId: randomUUID(),
+                    userId: 1n,
+                    userUuid,
+                    nodeUuid,
+                    destination: 'keep.other.test',
+                    destinationType: 'DOMAIN',
+                    network: 'udp',
+                    port: 53,
+                    requestedAt: new Date(now),
                     clientIdentifier: 'integration-user',
                 },
             ]);
@@ -160,8 +348,55 @@ test(
             const page = await clickhouse.getUserLogs({ userUuid, limit: 1 });
 
             assert.equal(page.items.length, 1);
-            assert.equal(page.items[0].id, eventId);
-            assert.equal(page.items[0].destination, 'integration.example.com');
+            assert.equal(page.items[0].destination, 'keep.other.test');
+            assert.ok(page.nextCursor);
+
+            const secondPage = await clickhouse.getUserLogs({
+                userUuid,
+                limit: 1,
+                cursor: page.nextCursor,
+            });
+            assert.equal(secondPage.items[0].destination, 'sub.noise.example.com');
+
+            const filtered = await clickhouse.getUserLogs({
+                userUuid,
+                limit: 10,
+                destination: 'other',
+                from: new Date(now - 500).toISOString(),
+                to: new Date(now + 500).toISOString(),
+                destinationType: 'DOMAIN',
+                nodeUuid,
+                network: 'udp',
+                port: 53,
+            });
+            assert.deepEqual(
+                filtered.items.map((item) => item.destination),
+                ['keep.other.test'],
+            );
+
+            const hiddenBySuffix = await clickhouse.getUserLogs({
+                userUuid,
+                limit: 10,
+                hideRules: [{ type: 'SUFFIX', pattern: 'noise.example.com' }],
+            });
+            assert.equal(
+                hiddenBySuffix.items.some((item) => item.destination === 'sub.noise.example.com'),
+                false,
+            );
+
+            const hiddenByGlob = await clickhouse.getUserLogs({
+                userUuid,
+                limit: 10,
+                hideRules: [{ type: 'GLOB', pattern: '*.example.com' }],
+            });
+            assert.deepEqual(
+                hiddenByGlob.items.map((item) => item.destination),
+                ['keep.other.test'],
+            );
+            assert.equal(
+                hiddenByGlob.items.some((item) => item.id === eventId),
+                false,
+            );
 
             const definitionResult = await clickhouse.client.query({
                 query: `SHOW CREATE TABLE traffic_logs`,

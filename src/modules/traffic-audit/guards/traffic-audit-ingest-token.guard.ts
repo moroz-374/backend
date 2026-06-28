@@ -1,20 +1,13 @@
-import { timingSafeEqual } from 'node:crypto';
-
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+
+import { TrafficAuditCredentialService } from '../credentials';
 
 @Injectable()
 export class TrafficAuditIngestTokenGuard implements CanActivate {
-    constructor(private readonly configService: ConfigService) {}
+    constructor(private readonly credentials: TrafficAuditCredentialService) {}
 
-    public canActivate(context: ExecutionContext): boolean {
+    public async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context.switchToHttp().getRequest<RequestLike>();
-
-        const expectedToken = this.configService.get<string>('TRAFFIC_AUDIT_INGEST_TOKEN');
-
-        if (!expectedToken) {
-            throw new UnauthorizedException('Traffic audit ingest token is not configured');
-        }
 
         const authorization = request.headers.authorization;
 
@@ -22,11 +15,8 @@ export class TrafficAuditIngestTokenGuard implements CanActivate {
             throw new UnauthorizedException('Missing bearer token');
         }
 
-        const receivedToken = authorization.slice('Bearer '.length).trim();
-
-        if (!safeCompare(receivedToken, expectedToken)) {
-            throw new UnauthorizedException('Invalid bearer token');
-        }
+        const credential = authorization.slice('Bearer '.length).trim();
+        request.trafficAuditNodeUuid = await this.credentials.authenticate(credential);
 
         return true;
     }
@@ -36,15 +26,5 @@ interface RequestLike {
     headers: {
         authorization?: string;
     };
-}
-
-function safeCompare(a: string, b: string): boolean {
-    const aBuffer = Buffer.from(a);
-    const bBuffer = Buffer.from(b);
-
-    if (aBuffer.length !== bBuffer.length) {
-        return false;
-    }
-
-    return timingSafeEqual(aBuffer, bBuffer);
+    trafficAuditNodeUuid?: string;
 }

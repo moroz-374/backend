@@ -3,6 +3,8 @@ import { ClickHouseClient, createClient } from '@clickhouse/client';
 import { BadRequestException, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { TTrafficAuditSettings } from '@libs/contracts/models';
+
 interface TrafficAuditInsertEvent {
     eventId: string;
     userId: bigint;
@@ -110,8 +112,31 @@ export class TrafficAuditClickhouseService implements OnModuleDestroy, OnModuleI
         });
     }
 
-    public async getUserLogs(params: { userUuid: string; cursor?: string; limit: number }) {
+    public async getUserLogs(params: {
+        userUuid: string;
+        cursor?: string;
+        limit: number;
+        destination?: string;
+        from?: string;
+        to?: string;
+        destinationType?: TrafficAuditRow['destinationType'];
+        nodeUuid?: string;
+        network?: TrafficAuditRow['network'];
+        port?: number;
+        hideRules?: TTrafficAuditSettings['hideRules'];
+    }) {
         const cursor = params.cursor ? decodeCursor(params.cursor) : undefined;
+        const exactRules =
+            params.hideRules?.filter((rule) => rule.type === 'EXACT').map((rule) => rule.pattern) ??
+            [];
+        const suffixRules =
+            params.hideRules
+                ?.filter((rule) => rule.type === 'SUFFIX')
+                .map((rule) => rule.pattern) ?? [];
+        const globRules =
+            params.hideRules
+                ?.filter((rule) => rule.type === 'GLOB')
+                .map((rule) => globToRegex(rule.pattern)) ?? [];
         const result = await this.client.query({
             query: `
                 SELECT
@@ -124,6 +149,19 @@ export class TrafficAuditClickhouseService implements OnModuleDestroy, OnModuleI
                     toString(node_uuid) AS nodeUuid
                 FROM traffic_logs FINAL
                 WHERE user_uuid = {userUuid:UUID}
+                  AND ({hasDestination:UInt8} = 0 OR position(destination, {destination:String}) > 0)
+                  AND ({hasFrom:UInt8} = 0 OR requested_at >= fromUnixTimestamp64Milli({fromMs:Int64}, 'UTC'))
+                  AND ({hasTo:UInt8} = 0 OR requested_at <= fromUnixTimestamp64Milli({toMs:Int64}, 'UTC'))
+                  AND ({hasDestinationType:UInt8} = 0 OR destination_type = {destinationType:String})
+                  AND ({hasNodeUuid:UInt8} = 0 OR node_uuid = {nodeUuid:UUID})
+                  AND ({hasNetwork:UInt8} = 0 OR network = {network:String})
+                  AND ({hasPort:UInt8} = 0 OR port = {port:UInt16})
+                  AND NOT has({hideExact:Array(String)}, destination)
+                  AND NOT arrayExists(
+                    suffix -> destination = suffix OR endsWith(destination, concat('.', suffix)),
+                    {hideSuffix:Array(String)}
+                  )
+                  AND NOT arrayExists(regex -> match(destination, regex), {hideGlob:Array(String)})
                   AND (
                     {hasCursor:UInt8} = 0
                     OR (requested_at, event_id) < (
@@ -136,6 +174,23 @@ export class TrafficAuditClickhouseService implements OnModuleDestroy, OnModuleI
             `,
             query_params: {
                 userUuid: params.userUuid,
+                hasDestination: params.destination ? 1 : 0,
+                destination: params.destination ?? '',
+                hasFrom: params.from ? 1 : 0,
+                fromMs: params.from ? String(Date.parse(params.from)) : '0',
+                hasTo: params.to ? 1 : 0,
+                toMs: params.to ? String(Date.parse(params.to)) : '0',
+                hasDestinationType: params.destinationType ? 1 : 0,
+                destinationType: params.destinationType ?? 'UNKNOWN',
+                hasNodeUuid: params.nodeUuid ? 1 : 0,
+                nodeUuid: params.nodeUuid ?? '00000000-0000-0000-0000-000000000000',
+                hasNetwork: params.network ? 1 : 0,
+                network: params.network ?? 'tcp',
+                hasPort: params.port ? 1 : 0,
+                port: params.port ?? 1,
+                hideExact: exactRules,
+                hideSuffix: suffixRules,
+                hideGlob: globRules,
                 hasCursor: cursor ? 1 : 0,
                 cursorRequestedAtMs: cursor?.requestedAtMs ?? '0',
                 cursorEventId: cursor?.eventId ?? '00000000-0000-0000-0000-000000000000',
@@ -156,19 +211,35 @@ export class TrafficAuditClickhouseService implements OnModuleDestroy, OnModuleI
             nextCursor:
                 hasMore && lastItem
                     ? encodeCursor({
-                        eventId: lastItem.id,
-                        requestedAtMs: lastItem.requestedAtMs,
-                    })
+                          eventId: lastItem.id,
+                          requestedAtMs: lastItem.requestedAtMs,
+                      })
                     : null,
         };
     }
+}
+
+export function globToRegex(glob: string): string {
+    let result = '^';
+
+    for (const character of glob) {
+        if (character === '*') {
+            result += '.*';
+        } else if (character === '?') {
+            result += '.';
+        } else {
+            result += character.replace(/[\\^$+.[\]{}()|]/g, '\\$&');
+        }
+    }
+
+    return `${result}$`;
 }
 
 function encodeCursor(cursor: TrafficAuditCursor): string {
     return Buffer.from(JSON.stringify(cursor)).toString('base64url');
 }
 
-function decodeCursor(value: string): TrafficAuditCursor {
+export function decodeCursor(value: string): TrafficAuditCursor {
     try {
         const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as unknown;
 

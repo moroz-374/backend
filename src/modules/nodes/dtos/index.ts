@@ -12,4 +12,5 @@ export * from './reorder.dto';
 export * from './reset-traffic.request.dto';
 export * from './restart-all.dto';
 export * from './restart-node.request.dto';
+export * from './rotate-traffic-audit-credential.dto';
 export * from './update-node.dto';

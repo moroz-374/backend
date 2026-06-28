@@ -33,13 +33,15 @@ model RemnawaveSettings {
   id Int @id @default(1)
 
   /// [PasskeySettings]
-  passkeySettings  Json? @map("passkey_settings")
+  passkeySettings      Json? @map("passkey_settings")
   /// [Oauth2Settings]
-  oauth2Settings   Json? @map("oauth2_settings")
+  oauth2Settings       Json? @map("oauth2_settings")
   /// [PasswordAuthSettings]
-  passwordSettings Json? @map("password_settings")
+  passwordSettings     Json? @map("password_settings")
   /// [BrandingSettings]
-  brandingSettings Json? @map("branding_settings")
+  brandingSettings     Json? @map("branding_settings")
+  /// [TrafficAuditSettings]
+  trafficAuditSettings Json? @map("traffic_audit_settings")
 
   @@map("remnawave_settings")
 }
@@ -206,6 +208,7 @@ model Nodes {
   connectedUsers               UserTraffic[]
   nodeMetas                    NodeMeta[]
   torrentBlockerReports        TorrentBlockerReports[]
+  trafficAuditCredential       TrafficAuditCredentials?
 
   activeConfigProfile ConfigProfiles? @relation(fields: [activeConfigProfileUuid], references: [uuid], onDelete: SetNull)
   provider            InfraProviders? @relation(fields: [providerUuid], references: [uuid], onDelete: SetNull)
@@ -213,6 +216,17 @@ model Nodes {
 
   @@index([id])
   @@map("nodes")
+}
+
+model TrafficAuditCredentials {
+  credentialId String   @id @map("credential_id") @db.VarChar(64)
+  secretHash   String   @map("secret_hash") @db.Char(64)
+  issuedAt     DateTime @default(dbgenerated("now()")) @map("issued_at") @db.Timestamptz(3)
+  nodeUuid     String?  @unique @map("node_uuid") @db.Uuid
+
+  node Nodes? @relation(fields: [nodeUuid], references: [uuid], onDelete: Cascade)
+
+  @@map("traffic_audit_credentials")
 }
 
 model NodesTrafficUsageHistory {

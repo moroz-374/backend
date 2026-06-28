@@ -43,10 +43,18 @@ export class NodesRepository implements ICrud<NodesEntity> {
         private readonly nodesConverter: NodesConverter,
     ) {}
 
-    public async create(entity: NodesEntity): Promise<NodesEntity> {
+    public async create(
+        entity: NodesEntity,
+        trafficAuditCredentialId?: string,
+    ): Promise<NodesEntity> {
         const model = this.nodesConverter.fromEntityToPrismaModel(entity);
         const result = await this.prisma.tx.nodes.create({
-            data: model,
+            data: {
+                ...model,
+                trafficAuditCredential: trafficAuditCredentialId
+                    ? { connect: { credentialId: trafficAuditCredentialId } }
+                    : undefined,
+            },
             include: INCLUDE_RESOLVED_INBOUNDS,
         });
 

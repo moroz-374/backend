@@ -9,9 +9,10 @@ import { KeygenController } from './keygen.controller';
 import { KeygenConverter } from './keygen.converter';
 import { KeygenService } from './keygen.service';
 import { COMMANDS } from './commands';
+import { TrafficAuditCredentialModule } from '@modules/traffic-audit/credentials';
 
 @Module({
-    imports: [CqrsModule, JwtModule.registerAsync(getJWTConfig())],
+    imports: [CqrsModule, JwtModule.registerAsync(getJWTConfig()), TrafficAuditCredentialModule],
     controllers: [KeygenController],
     providers: [KeygenRepository, KeygenService, KeygenConverter, ...COMMANDS],
 })

@@ -35,6 +35,7 @@ import {
 import { NodesSystemCacheService } from './nodes-system-cache.service';
 import { NodesRepository } from './repositories/nodes.repository';
 import { NodesEntity } from './entities';
+import { TrafficAuditCredentialService } from '@modules/traffic-audit/credentials';
 
 @Injectable()
 export class NodesService {
@@ -47,11 +48,15 @@ export class NodesService {
         private readonly queryBus: QueryBus,
         private readonly commandBus: CommandBus,
         private readonly nodesSystemCacheService: NodesSystemCacheService,
+        private readonly trafficAuditCredentials: TrafficAuditCredentialService,
     ) {}
 
     public async createNode(body: CreateNodeRequestDto): Promise<TResult<NodeResponseModel>> {
         try {
-            const { configProfile, ...nodeData } = body;
+            const { configProfile, trafficAuditCredential, ...nodeData } = body;
+            const trafficAuditCredentialId =
+                await this.trafficAuditCredentials.validateUnbound(trafficAuditCredential);
+            await this.trafficAuditCredentials.invalidate(trafficAuditCredentialId);
 
             const nodeEntity = new NodesEntity({
                 ...nodeData,
@@ -64,7 +69,7 @@ export class NodesService {
                 activeConfigProfileUuid: configProfile.activeConfigProfileUuid,
             });
 
-            const result = await this.nodesRepository.create(nodeEntity);
+            const result = await this.nodesRepository.create(nodeEntity, trafficAuditCredentialId);
 
             if (configProfile) {
                 const configProfileResponse = await this.queryBus.execute(
@@ -123,6 +128,10 @@ export class NodesService {
             this.logger.error(error);
             return fail(ERRORS.CREATE_NODE_ERROR);
         }
+    }
+
+    public async rotateTrafficAuditCredential(nodeUuid: string) {
+        return this.trafficAuditCredentials.rotate(nodeUuid);
     }
 
     public async getAllNodes(): Promise<TResult<NodeResponseModel[]>> {

@@ -5,6 +5,7 @@ import {
     TOauth2Settings,
     TPasswordAuthSettings,
     TRemnawavePasskeySettings,
+    TTrafficAuditSettings,
 } from '@libs/contracts/models';
 
 export class RemnawaveSettingsEntity implements RemnawaveSettings {
@@ -13,6 +14,7 @@ export class RemnawaveSettingsEntity implements RemnawaveSettings {
     public oauth2Settings: TOauth2Settings;
     public passwordSettings: TPasswordAuthSettings;
     public brandingSettings: TBrandingSettings;
+    public trafficAuditSettings: TTrafficAuditSettings;
 
     constructor(remnawaveSettings: Partial<RemnawaveSettings>) {
         Object.assign(this, remnawaveSettings);

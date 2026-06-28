@@ -9,9 +9,10 @@ import { NodesService } from './nodes.service';
 import { COMMANDS } from './commands';
 import { QUERIES } from './queries';
 import { EVENTS } from './events';
+import { TrafficAuditCredentialModule } from '@modules/traffic-audit/credentials';
 
 @Module({
-    imports: [CqrsModule],
+    imports: [CqrsModule, TrafficAuditCredentialModule],
     controllers: [NodesController],
     providers: [
         NodesRepository,

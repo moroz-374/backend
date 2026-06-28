@@ -15,8 +15,13 @@ const trafficEventSchema = z.object({
 });
 
 export const ingestTrafficLogsSchema = z.object({
-    nodeUuid: z.string().uuid(),
     events: z.array(trafficEventSchema).min(1).max(5000),
+    metrics: z.object({
+        queueDepth: z.number().int().min(0),
+        droppedEventsTotal: z.number().int().min(0),
+        retryAttemptsTotal: z.number().int().min(0),
+        lastSuccessfulDeliveryAt: z.number().int().min(0).nullable(),
+    }),
 });
 
 export class IngestTrafficLogsDto extends createZodDto(ingestTrafficLogsSchema) {}

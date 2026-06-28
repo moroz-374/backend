@@ -6,6 +6,7 @@ import {
     PasskeySettingsSchema,
     PasswordAuthSettingsSchema,
     RemnawaveSettingsSchema,
+    TrafficAuditSettingsSchema,
 } from '../../models';
 import { REMNAAWAVE_SETTINGS_ROUTES, REST_API } from '../../api';
 import { getEndpointDetails } from '../../constants';
@@ -25,6 +26,7 @@ export namespace UpdateRemnawaveSettingsCommand {
         oauth2Settings: Oauth2SettingsSchema.optional(),
         passwordSettings: PasswordAuthSettingsSchema.optional(),
         brandingSettings: BrandingSettingsSchema.optional(),
+        trafficAuditSettings: TrafficAuditSettingsSchema.optional(),
     });
 
     export type Request = z.infer<typeof RequestSchema>;

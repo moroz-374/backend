@@ -14,6 +14,7 @@ export namespace CreateNodeCommand {
     );
 
     export const RequestSchema = z.object({
+        trafficAuditCredential: z.string().regex(/^[A-Za-z0-9_-]{20,64}\.[A-Za-z0-9_-]{32,128}$/),
         name: z.string().min(3, 'Minimum 3 characters!').max(30, 'Maximum 30 characters!'),
         address: z.string().min(2, 'Minimum 2 characters!'),
         port: z

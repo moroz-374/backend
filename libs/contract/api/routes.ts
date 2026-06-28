@@ -69,6 +69,10 @@ export const REST_API = {
                 `${ROOT}/${CONTROLLERS.NODES_CONTROLLER}/${CONTROLLERS.NODES_ROUTES.ACTIONS.RESET_TRAFFIC(
                     uuid,
                 )}`,
+            ROTATE_TRAFFIC_AUDIT_CREDENTIAL: (uuid: string) =>
+                `${ROOT}/${CONTROLLERS.NODES_CONTROLLER}/${CONTROLLERS.NODES_ROUTES.ACTIONS.ROTATE_TRAFFIC_AUDIT_CREDENTIAL(
+                    uuid,
+                )}`,
             REORDER: `${ROOT}/${CONTROLLERS.NODES_CONTROLLER}/${CONTROLLERS.NODES_ROUTES.ACTIONS.REORDER}`,
         },
 
