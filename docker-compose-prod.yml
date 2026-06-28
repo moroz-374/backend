@@ -39,6 +39,8 @@ services:
         condition: service_healthy
       remnawave-redis:
         condition: service_healthy
+      remnawave-clickhouse:
+        condition: service_healthy
 
   remnawave-db:
     image: postgres:17.6
@@ -82,6 +84,30 @@ services:
       timeout: 3s
       retries: 3
 
+  remnawave-clickhouse:
+    image: clickhouse:26.3.15.4
+    container_name: remnawave-clickhouse
+    hostname: remnawave-clickhouse
+    <<: [*common, *logging]
+    environment:
+      CLICKHOUSE_DB: ${TRAFFIC_AUDIT_CLICKHOUSE_DATABASE:-remnawave}
+      CLICKHOUSE_USER: ${TRAFFIC_AUDIT_CLICKHOUSE_USER:-remnawave}
+      CLICKHOUSE_PASSWORD: ${TRAFFIC_AUDIT_CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      TZ: UTC
+    volumes:
+      - remnawave-clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'clickhouse-client --user "$${CLICKHOUSE_USER}" --password "$${CLICKHOUSE_PASSWORD}" --query "SELECT 1"',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
 networks:
   remnawave-network:
     name: remnawave-network
@@ -95,5 +121,9 @@ volumes:
     external: false
   valkey-socket:
     name: valkey-socket
+    driver: local
+    external: false
+  remnawave-clickhouse-data:
+    name: remnawave-clickhouse-data
     driver: local
     external: false

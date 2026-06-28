@@ -14,6 +14,7 @@ export class GetFullUserResponseModel {
 
     public readonly trafficLimitBytes: number;
     public readonly trafficLimitStrategy: TResetPeriods;
+    public readonly isAuditEnabled: boolean;
 
     public readonly expireAt: Date;
 
@@ -59,6 +60,7 @@ export class GetFullUserResponseModel {
 
         this.trafficLimitBytes = Number(entity.trafficLimitBytes);
         this.trafficLimitStrategy = entity.trafficLimitStrategy;
+        this.isAuditEnabled = entity.isAuditEnabled;
 
         this.expireAt = entity.expireAt;
 

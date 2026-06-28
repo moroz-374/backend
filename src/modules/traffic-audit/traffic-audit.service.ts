@@ -1,75 +1,57 @@
 import {Injectable, NotFoundException} from '@nestjs/common';
 
 import {PrismaService} from '@common/database/prisma.service';
+
+import { TrafficAuditClickhouseService } from './traffic-audit-clickhouse.service';
 import { IngestTrafficLogsDto } from './dtos/ingest-traffic-logs.dto';
 
 @Injectable()
 export class TrafficAuditService {
-    constructor(private readonly prisma: PrismaService) {
-    }
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly clickhouse: TrafficAuditClickhouseService,
+    ) {}
 
     public async updateAuditFlag(userUuid: string, enabled: boolean) {
-        try {
-            return await this.prisma.users.update({
-                where: {
-                    uuid: userUuid,
-                },
-                data: {
-                    isAuditEnabled: enabled,
-                },
-                select: {
-                    uuid: true,
-                    isAuditEnabled: true,
-                },
-            });
-        } catch {
-            throw new NotFoundException('User not found');
-        }
-    }
-
-    public async getUserLogs(userUuid: string, params: { cursor?: string; limit: number }) {
-        const cursor = params.cursor ? BigInt(params.cursor) : undefined;
-
-        const rows = await this.prisma.trafficLog.findMany({
+        const user = await this.prisma.users.findUnique({
             where: {
-                user: {
-                    uuid: userUuid,
-                },
+                uuid: userUuid,
             },
-            orderBy: {
-                id: 'desc',
-            },
-            take: params.limit + 1,
-            ...(cursor
-                ? {
-                    cursor: {
-                        id: cursor,
-                    },
-                    skip: 1,
-                }
-                : {}),
             select: {
-                id: true,
-                destination: true,
-                destinationType: true,
-                network: true,
-                port: true,
-                requestedAt: true,
-                nodeUuid: true,
+                uuid: true,
+                isAuditEnabled: true,
+                auditEnabledAt: true,
             },
         });
 
-        const hasMore = rows.length > params.limit;
-        const items = hasMore ? rows.slice(0, params.limit) : rows;
-        const lastItem = items.at(-1);
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
 
-        return {
-            items: items.map((item) => ({
-                ...item,
-                id: item.id.toString(),
-            })),
-            nextCursor: hasMore && lastItem ? lastItem.id.toString() : null,
-        };
+        if (user.isAuditEnabled === enabled) {
+            return {
+                uuid: user.uuid,
+                isAuditEnabled: user.isAuditEnabled,
+            };
+        }
+
+        return this.prisma.users.update({
+            where: {
+                uuid: userUuid,
+            },
+            data: {
+                isAuditEnabled: enabled,
+                auditEnabledAt: enabled ? new Date() : null,
+            },
+            select: {
+                uuid: true,
+                isAuditEnabled: true,
+            },
+        });
+    }
+
+    public async getUserLogs(userUuid: string, params: { cursor?: string; limit: number }) {
+        return this.clickhouse.getUserLogs({ userUuid, ...params });
     }
 
     public async ingest(body: IngestTrafficLogsDto) {
@@ -101,31 +83,40 @@ export class TrafficAuditService {
                 email: true,
                 username: true,
                 uuid: true,
+                auditEnabledAt: true,
             },
         });
 
-        const identifierToUserId = new Map<string, bigint>();
+        const identifierToUser = new Map<
+            string,
+            { auditEnabledAt: Date | null; tId: bigint; uuid: string }
+        >();
 
         for (const user of auditedUsers) {
             if (user.email) {
-                identifierToUserId.set(user.email, user.tId);
+                identifierToUser.set(user.email, user);
             }
 
-            identifierToUserId.set(user.username, user.tId);
-            identifierToUserId.set(user.uuid, user.tId);
+            identifierToUser.set(user.username, user);
+            identifierToUser.set(user.uuid, user);
         }
 
         const logsToInsert = body.events.flatMap((event) => {
-            const userId = identifierToUserId.get(event.clientIdentifier);
+            const user = identifierToUser.get(event.clientIdentifier);
 
-            if (!userId) {
+            if (
+                !user ||
+                !user.auditEnabledAt ||
+                new Date(event.requestedAt) < user.auditEnabledAt
+            ) {
                 return [];
             }
 
             return [
                 {
                     eventId: event.eventId,
-                    userId,
+                    userId: user.tId,
+                    userUuid: user.uuid,
                     nodeUuid: body.nodeUuid,
                     destination: event.destination.trim().toLowerCase().replace(/\.$/, ''),
                     destinationType: event.destinationType,
@@ -137,15 +128,12 @@ export class TrafficAuditService {
             ];
         });
 
-        const result = await this.prisma.trafficLog.createMany({
-            data: logsToInsert,
-            skipDuplicates: true,
-        });
+        await this.clickhouse.insert(logsToInsert);
 
         return {
             received: body.events.length,
             accepted: logsToInsert.length,
-            inserted: result.count,
+            inserted: logsToInsert.length,
             discarded: body.events.length - logsToInsert.length,
         };
     }

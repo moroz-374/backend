@@ -61,7 +61,7 @@ import { TrafficAuditModule } from './traffic-audit/traffic-audit.module';
         ConditionalModule.registerWhen(RemnawaveServiceModule, () => isScheduler()),
         ConditionalModule.registerWhen(IpControlModule, () => isRestApi()),
         ConditionalModule.registerWhen(MetadataModule, () => isRestApi()),
-        TrafficAuditModule
+        ConditionalModule.registerWhen(TrafficAuditModule, () => isRestApi()),
     ],
 })
 export class RemnawaveModules {}

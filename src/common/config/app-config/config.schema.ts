@@ -15,6 +15,25 @@ export const configSchema = z
         __RW_METADATA_BUILD_NUMBER: z.string().default('0'),
 
         DATABASE_URL: z.string(),
+        TRAFFIC_AUDIT_INGEST_TOKEN: z
+            .string()
+            .min(32, 'TRAFFIC_AUDIT_INGEST_TOKEN must be at least 32 characters long')
+            .refine(
+                (value) => value !== 'change_me_generate_long_random_token',
+                'TRAFFIC_AUDIT_INGEST_TOKEN must be changed',
+            ),
+        TRAFFIC_AUDIT_CLICKHOUSE_URL: z.string().url().default('http://remnawave-clickhouse:8123'),
+        TRAFFIC_AUDIT_CLICKHOUSE_USER: z.string().min(1).default('remnawave'),
+        TRAFFIC_AUDIT_CLICKHOUSE_PASSWORD: z.string().min(16),
+        TRAFFIC_AUDIT_CLICKHOUSE_DATABASE: z.string().min(1).default('remnawave'),
+        TRAFFIC_AUDIT_RETENTION_DAYS: z
+            .string()
+            .default('30')
+            .transform((value) => parseInt(value, 10))
+            .refine(
+                (value) => Number.isInteger(value) && value >= 1 && value <= 3650,
+                'TRAFFIC_AUDIT_RETENTION_DAYS must be between 1 and 3650',
+            ),
         APP_PORT: z
             .string()
             .default('3000')

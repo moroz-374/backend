@@ -20,6 +20,7 @@
   },
   "scripts": {
     "build": "nest build",
+    "test:traffic-audit": "node --test test/traffic-audit/traffic-audit.contract.test.js",
     "build:seed": "tsc -p prisma/tsconfig.seed.json",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
@@ -48,6 +49,7 @@
     "@bull-board/api": "^6.18.2",
     "@bull-board/express": "^6.18.2",
     "@bull-board/nestjs": "^6.18.2",
+    "@clickhouse/client": "^1.22.0",
     "@grammyjs/parse-mode": "1.11.1",
     "@kastov/cryptohapp": "^1.1.2",
     "@kastov/grammy-nestjs": "0.4.2",

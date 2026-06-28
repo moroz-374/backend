@@ -35,6 +35,8 @@ RUN npm run migrate:generate
 
 RUN npm run build
 
+RUN npm run test:traffic-audit
+
 RUN npm cache clean --force 
 
 RUN npm prune --omit=dev

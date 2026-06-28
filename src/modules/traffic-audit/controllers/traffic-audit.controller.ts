@@ -1,17 +1,17 @@
 import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 
-import { Roles } from '@common/decorators/roles/roles';
 import { JwtDefaultGuard } from '@common/guards/jwt-guards/def-jwt-guard';
+import { Roles } from '@common/decorators/roles/roles';
 import { RolesGuard } from '@common/guards/roles';
 import { ROLE } from '@libs/contracts/constants';
 
 import { UpdateTrafficAuditDto } from '../dtos/update-traffic-audit.dto';
-import { TrafficAuditService } from '../traffic-audit.service';
 import { GetTrafficLogsDto } from '../dtos/get-traffic-logs.dto';
+import { TrafficAuditService } from '../traffic-audit.service';
 
 @Roles(ROLE.ADMIN, ROLE.API)
 @UseGuards(JwtDefaultGuard, RolesGuard)
-@Controller('api/users/:uuid/traffic-audit')
+@Controller('users/:uuid/traffic-audit')
 export class TrafficAuditController {
     constructor(private readonly trafficAuditService: TrafficAuditService) {}
 

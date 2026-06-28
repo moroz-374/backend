@@ -21,6 +21,7 @@ const entityToModel = (entity: BaseUserEntity): Users => {
         trafficLimitBytes: entity.trafficLimitBytes,
         trafficLimitStrategy: entity.trafficLimitStrategy,
         isAuditEnabled: entity.isAuditEnabled,
+        auditEnabledAt: entity.auditEnabledAt,
 
         expireAt: entity.expireAt,
         subRevokedAt: entity.subRevokedAt,

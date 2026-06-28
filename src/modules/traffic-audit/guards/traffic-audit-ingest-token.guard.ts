@@ -1,6 +1,7 @@
+import { timingSafeEqual } from 'node:crypto';
+
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { timingSafeEqual } from 'node:crypto';
 
 @Injectable()
 export class TrafficAuditIngestTokenGuard implements CanActivate {
