@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "version": "2.7.4-traffic-audit.1",
+  "registry": "ghcr.io",
+  "owner": "moroz-374",
+  "channelTag": "stable",
+  "images": {
+    "backend": "ghcr.io/moroz-374/remnawave-backend",
+    "node": "ghcr.io/moroz-374/remnawave-node"
+  },
+  "sources": {
+    "backend": {
+      "url": "https://github.com/moroz-374/backend",
+      "upstreamVersion": "2.7.4"
+    },
+    "frontend": {
+      "url": "https://github.com/moroz-374/frontend",
+      "upstreamVersion": "2.7.4"
+    },
+    "node": {
+      "url": "https://github.com/moroz-374/node",
+      "upstreamVersion": "2.7.0"
+    }
+  }
+}

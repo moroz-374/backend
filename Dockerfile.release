@@ -46,12 +46,14 @@ ARG __RW_METADATA_BUILD_NUMBER=0
 
 LABEL org.opencontainers.image.title="Remnawave" \
     org.opencontainers.image.description="Remnawave backend with locally built traffic-audit frontend" \
-    org.opencontainers.image.url="https://github.com/remnawave/backend" \
-    org.opencontainers.image.source="https://github.com/remnawave/backend" \
+    org.opencontainers.image.url="https://github.com/moroz-374/backend" \
+    org.opencontainers.image.source="https://github.com/moroz-374/backend" \
     org.opencontainers.image.vendor="Remnawave" \
     org.opencontainers.image.licenses="AGPL-3.0-only" \
+    org.opencontainers.image.documentation="https://docs.rw" \
     org.opencontainers.image.version=$__RW_METADATA_VERSION \
     org.opencontainers.image.revision=$__RW_METADATA_GIT_BACKEND_COMMIT \
+    io.remnawave.frontend.source="https://github.com/moroz-374/frontend" \
     io.remnawave.frontend.revision=$__RW_METADATA_GIT_FRONTEND_COMMIT
 
 RUN apt-get update \
