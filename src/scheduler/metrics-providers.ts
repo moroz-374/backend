@@ -159,6 +159,26 @@ export const METRIC_PROVIDERS = [
         help: 'Node basic info',
         labelNames: ['node_uuid', 'node_name', 'node_country_emoji', 'provider_name', 'tags'],
     }),
+    makeGaugeProvider({
+        name: METRIC_NAMES.TRAFFIC_AUDIT_SENDER_QUEUE_DEPTH,
+        help: 'Last reported traffic audit sender queue depth',
+        labelNames: ['node_uuid'],
+    }),
+    makeGaugeProvider({
+        name: METRIC_NAMES.TRAFFIC_AUDIT_SENDER_DROPPED_EVENTS_TOTAL,
+        help: 'Last reported cumulative traffic audit sender overflow drops',
+        labelNames: ['node_uuid'],
+    }),
+    makeGaugeProvider({
+        name: METRIC_NAMES.TRAFFIC_AUDIT_SENDER_RETRY_ATTEMPTS_TOTAL,
+        help: 'Last reported cumulative traffic audit sender retry attempts',
+        labelNames: ['node_uuid'],
+    }),
+    makeGaugeProvider({
+        name: METRIC_NAMES.TRAFFIC_AUDIT_SENDER_LAST_SUCCESS_UNIXTIME,
+        help: 'Last reported traffic audit sender success as Unix time',
+        labelNames: ['node_uuid'],
+    }),
 ];
 
 export interface INodeBaseMetricLabels {

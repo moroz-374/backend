@@ -1,0 +1,21 @@
+{
+  "log": { "loglevel": "warning" },
+  "inbounds": [
+    { "tag": "enabled-socks", "listen": "0.0.0.0", "port": 1081, "protocol": "socks", "settings": { "udp": true } },
+    { "tag": "disabled-socks", "listen": "0.0.0.0", "port": 1082, "protocol": "socks", "settings": { "udp": true } },
+    { "tag": "pre-enable-socks", "listen": "0.0.0.0", "port": 1083, "protocol": "socks", "settings": { "udp": true } },
+    { "tag": "enabled-udp", "listen": "0.0.0.0", "port": 1053, "protocol": "dokodemo-door", "settings": { "address": "traffic-audit-target", "port": 5300, "network": "udp" } }
+  ],
+  "outbounds": [
+    { "tag": "enabled", "protocol": "vless", "settings": { "vnext": [{ "address": "traffic-audit-node", "port": 10000, "users": [{ "id": "10000000-0000-4000-8000-000000000001", "encryption": "none" }] }] } },
+    { "tag": "disabled", "protocol": "vless", "settings": { "vnext": [{ "address": "traffic-audit-node", "port": 10000, "users": [{ "id": "10000000-0000-4000-8000-000000000002", "encryption": "none" }] }] } },
+    { "tag": "pre-enable", "protocol": "vless", "settings": { "vnext": [{ "address": "traffic-audit-node", "port": 10000, "users": [{ "id": "10000000-0000-4000-8000-000000000003", "encryption": "none" }] }] } }
+  ],
+  "routing": {
+    "rules": [
+      { "type": "field", "inboundTag": ["enabled-socks", "enabled-udp"], "outboundTag": "enabled" },
+      { "type": "field", "inboundTag": ["disabled-socks"], "outboundTag": "disabled" },
+      { "type": "field", "inboundTag": ["pre-enable-socks"], "outboundTag": "pre-enable" }
+    ]
+  }
+}

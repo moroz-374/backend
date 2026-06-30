@@ -91,6 +91,14 @@ export class ExportMetricsTask {
         public nodeSystemInfo: Gauge<string>,
         @InjectMetric(METRIC_NAMES.NODE_BASIC_INFO)
         public nodeBasicInfo: Gauge<string>,
+        @InjectMetric(METRIC_NAMES.TRAFFIC_AUDIT_SENDER_QUEUE_DEPTH)
+        public trafficAuditSenderQueueDepth: Gauge<string>,
+        @InjectMetric(METRIC_NAMES.TRAFFIC_AUDIT_SENDER_DROPPED_EVENTS_TOTAL)
+        public trafficAuditSenderDroppedEvents: Gauge<string>,
+        @InjectMetric(METRIC_NAMES.TRAFFIC_AUDIT_SENDER_RETRY_ATTEMPTS_TOTAL)
+        public trafficAuditSenderRetryAttempts: Gauge<string>,
+        @InjectMetric(METRIC_NAMES.TRAFFIC_AUDIT_SENDER_LAST_SUCCESS_UNIXTIME)
+        public trafficAuditSenderLastSuccess: Gauge<string>,
 
         private readonly queryBus: QueryBus,
     ) {
@@ -109,6 +117,7 @@ export class ExportMetricsTask {
             await this.reportShortUserStats();
             await this.reportNodesStats();
             await this.reportRuntimeMetrics();
+            await this.reportTrafficAuditMetrics();
         } catch (error) {
             this.logger.error(`Error in ExportMetricsTask: ${error}`);
         }
@@ -299,6 +308,37 @@ export class ExportMetricsTask {
             }
         } catch (error) {
             this.logger.error(`Error in reportRuntimeMetrics: ${error}`);
+        }
+    }
+
+    public async reportTrafficAuditMetrics() {
+        const snapshots = await this.rawCacheService.hgetallParsed<
+            Record<
+                string,
+                {
+                    queueDepth: number;
+                    droppedEventsTotal: number;
+                    retryAttemptsTotal: number;
+                    lastSuccessfulDeliveryAt: number | null;
+                }
+            >
+        >(INTERNAL_CACHE_KEYS.TRAFFIC_AUDIT_SENDER_METRICS);
+
+        if (!snapshots) {
+            return;
+        }
+
+        for (const [nodeUuid, snapshot] of Object.entries(snapshots)) {
+            const labels = { node_uuid: nodeUuid };
+            this.trafficAuditSenderQueueDepth.set(labels, snapshot.queueDepth);
+            this.trafficAuditSenderDroppedEvents.set(labels, snapshot.droppedEventsTotal);
+            this.trafficAuditSenderRetryAttempts.set(labels, snapshot.retryAttemptsTotal);
+            this.trafficAuditSenderLastSuccess.set(
+                labels,
+                snapshot.lastSuccessfulDeliveryAt
+                    ? snapshot.lastSuccessfulDeliveryAt / 1_000
+                    : 0,
+            );
         }
     }
 

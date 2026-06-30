@@ -97,18 +97,22 @@ test('the public user contract exposes the persisted audit flag', () => {
 test('ingest rejects queued events captured before audit was enabled', async () => {
     const auditEnabledAt = new Date('2026-06-27T15:00:00.000Z');
     const inserted = [];
+    let userQuery;
     const service = new TrafficAuditService(
         {
             users: {
-                findMany: async () => [
-                    {
-                        tId: 1n,
-                        uuid: '0b87ca01-9d3d-4aef-90b2-a6d70ca0ce51',
-                        username: 'audit-user',
-                        email: null,
-                        auditEnabledAt,
-                    },
-                ],
+                findMany: async (query) => {
+                    userQuery = query;
+                    return [
+                        {
+                            tId: 1n,
+                            uuid: '0b87ca01-9d3d-4aef-90b2-a6d70ca0ce51',
+                            username: 'audit-user',
+                            email: null,
+                            auditEnabledAt,
+                        },
+                    ];
+                },
             },
         },
         {
@@ -153,6 +157,7 @@ test('ingest rejects queued events captured before audit was enabled', async () 
     assert.equal(result.inserted, 1);
     assert.equal(result.discarded, 1);
     assert.equal(inserted[0].destination, 'after.example.com');
+    assert.equal(userQuery.where.OR.some((condition) => condition.uuid), false);
 });
 
 test('traffic log filters reject malformed cursors and invalid bounds', () => {

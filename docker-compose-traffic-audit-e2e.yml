@@ -1,0 +1,186 @@
+name: remnawave-traffic-audit-e2e
+
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql://postgres:postgres@postgres:5432/remnawave
+  REDIS_HOST: valkey
+  REDIS_PORT: 6379
+  REDIS_DB: 1
+  APP_PORT: 3000
+  METRICS_PORT: 3001
+  JWT_AUTH_SECRET: e2e-jwt-auth-secret-not-for-production
+  JWT_API_TOKENS_SECRET: e2e-jwt-api-secret-not-for-production
+  FRONT_END_DOMAIN: '*'
+  SUB_PUBLIC_DOMAIN: backend:3000/api/sub
+  METRICS_USER: e2e
+  METRICS_PASS: e2e
+  TRAFFIC_AUDIT_CLICKHOUSE_URL: http://clickhouse:8123
+  TRAFFIC_AUDIT_CLICKHOUSE_USER: remnawave
+  TRAFFIC_AUDIT_CLICKHOUSE_PASSWORD: e2e-clickhouse-password
+  TRAFFIC_AUDIT_CLICKHOUSE_DATABASE: remnawave
+  TRAFFIC_AUDIT_RETENTION_DAYS: 1
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: remnawave
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres -d remnawave]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  valkey:
+    image: valkey/valkey:9-alpine
+    command: [valkey-server, --save, '', --appendonly, 'no']
+    healthcheck:
+      test: [CMD, valkey-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  clickhouse:
+    image: clickhouse:26.3.15.4
+    environment:
+      CLICKHOUSE_DB: remnawave
+      CLICKHOUSE_USER: remnawave
+      CLICKHOUSE_PASSWORD: e2e-clickhouse-password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    healthcheck:
+      test: [CMD-SHELL, 'clickhouse-client --user "$${CLICKHOUSE_USER}" --password "$${CLICKHOUSE_PASSWORD}" --query "SELECT 1"']
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 10s
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    environment: *backend-env
+    depends_on:
+      postgres: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+    healthcheck:
+      test: [CMD-SHELL, 'curl -fsS -H "X-Forwarded-For: 127.0.0.1" -H "X-Forwarded-Proto: https" http://localhost:3001/health']
+      interval: 3s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+  provision:
+    build: ./test/traffic-audit/e2e
+    command: [sh, -c, 'node provision.mjs && touch /run/e2e/provisioned && tail -f /dev/null']
+    environment:
+      BACKEND_URL: http://backend:3000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/remnawave
+      JWT_AUTH_SECRET: e2e-jwt-auth-secret-not-for-production
+      E2E_NODE_UUID: 20000000-0000-4000-8000-000000000001
+    volumes:
+      - e2e-secrets:/run/e2e
+    depends_on:
+      backend: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, test, -f, /run/e2e/provisioned]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+
+  ingest-proxy:
+    build: ./test/traffic-audit/e2e
+    command: [node, proxy.mjs]
+    environment:
+      BACKEND_URL: http://backend:3000
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/health]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      backend: { condition: service_healthy }
+
+  traffic-audit-node:
+    container_name: remnawave-traffic-audit-e2e-node
+    build:
+      context: ../node
+      dockerfile: Dockerfile
+    entrypoint: [/bin/sh, /e2e/node-entrypoint.sh]
+    command: [node, dist/src/main]
+    environment:
+      NODE_PORT: 2222
+      XTLS_API_PORT: 61000
+      XRAY_ACCESS_LOG_PATH: /var/log/xray/access.log
+      TRAFFIC_AUDIT_BACKEND_URL: http://ingest-proxy:8080
+      TRAFFIC_AUDIT_FLUSH_INTERVAL_MS: 500
+      TRAFFIC_AUDIT_QUEUE_MAX_SIZE: 3
+      TRAFFIC_AUDIT_REQUEST_TIMEOUT_MS: 1000
+      TRAFFIC_AUDIT_BACKOFF_INITIAL_MS: 200
+      TRAFFIC_AUDIT_BACKOFF_MAX_MS: 1000
+    volumes:
+      - ./test/traffic-audit/e2e:/e2e:ro
+      - e2e-secrets:/run/e2e:ro
+    depends_on:
+      provision: { condition: service_healthy }
+      ingest-proxy: { condition: service_healthy }
+    healthcheck:
+      test: [CMD-SHELL, nc -z 127.0.0.1 2222]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  xray-client:
+    build:
+      context: ../node
+      dockerfile: Dockerfile
+    entrypoint: [/usr/local/bin/xray]
+    command: [run, -config, /e2e/xray-client.json]
+    volumes:
+      - ./test/traffic-audit/e2e:/e2e:ro
+    depends_on:
+      traffic-audit-node: { condition: service_healthy }
+    healthcheck:
+      test: [CMD-SHELL, nc -z 127.0.0.1 1081]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  traffic-audit-target:
+    build: ./test/traffic-audit/e2e
+    command: [node, target.mjs]
+    networks:
+      default:
+        aliases:
+          - traffic-audit-target
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  test:
+    build: ./test/traffic-audit/e2e
+    command: [node, test.mjs]
+    environment:
+      BACKEND_URL: http://backend:3000
+      NODE_URL: https://traffic-audit-node:2222
+      PROXY_URL: http://ingest-proxy:8080
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/remnawave
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: remnawave
+      CLICKHOUSE_PASSWORD: e2e-clickhouse-password
+      E2E_NODE_UUID: 20000000-0000-4000-8000-000000000001
+      NODE_CONTAINER: remnawave-traffic-audit-e2e-node
+    volumes:
+      - e2e-secrets:/run/e2e
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      backend: { condition: service_healthy }
+      traffic-audit-node: { condition: service_healthy }
+      xray-client: { condition: service_healthy }
+      traffic-audit-target: { condition: service_healthy }
+
+volumes:
+  e2e-secrets:

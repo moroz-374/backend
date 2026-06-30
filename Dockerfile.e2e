@@ -1,0 +1,49 @@
+FROM node:24.14-trixie-slim AS build
+WORKDIR /opt/app
+
+ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x,linux-arm64-openssl-3.0.x
+
+COPY package*.json ./
+COPY prisma ./prisma
+COPY prisma.config.ts ./prisma.config.ts
+COPY patches ./patches
+RUN npm ci
+
+COPY . .
+RUN npm run migrate:generate \
+    && npm run build \
+    && npm run test:traffic-audit \
+    && npm prune --omit=dev \
+    && npm cache clean --force
+
+FROM node:24.14-trixie-slim
+WORKDIR /opt/app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install -g pm2
+
+ENV NODE_ENV=production
+ENV REMNAWAVE_BRANCH=dev
+ENV PRISMA_HIDE_UPDATE_MESSAGE=true
+ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
+ENV PM2_DISABLE_VERSION_CHECK=true
+ENV NODE_OPTIONS=--max-old-space-size=16384
+
+COPY --from=build /opt/app/dist ./dist
+COPY --from=build /opt/app/prisma ./prisma
+COPY --from=build /opt/app/patches ./patches
+COPY --from=build /opt/app/node_modules ./node_modules
+COPY configs /var/lib/remnawave/configs
+COPY package*.json ./
+COPY prisma.config.ts ./prisma.config.ts
+COPY libs ./libs
+COPY ecosystem.config.js docker-entrypoint.sh ./
+
+RUN sed -i 's/\r$//' docker-entrypoint.sh \
+    && mkdir -p frontend \
+    && npm link
+
+ENTRYPOINT ["/bin/sh", "docker-entrypoint.sh"]
+CMD ["pm2-runtime", "start", "ecosystem.config.js", "--env", "production"]

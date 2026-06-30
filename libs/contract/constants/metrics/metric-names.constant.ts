@@ -38,6 +38,10 @@ export const METRIC_NAMES = {
 
     NODE_BASIC_INFO: 'node_basic_info',
     NODE_SYSTEM_INFO: 'node_system_info',
+    TRAFFIC_AUDIT_SENDER_QUEUE_DEPTH: 'traffic_audit_sender_queue_depth',
+    TRAFFIC_AUDIT_SENDER_DROPPED_EVENTS_TOTAL: 'traffic_audit_sender_dropped_events_total',
+    TRAFFIC_AUDIT_SENDER_RETRY_ATTEMPTS_TOTAL: 'traffic_audit_sender_retry_attempts_total',
+    TRAFFIC_AUDIT_SENDER_LAST_SUCCESS_UNIXTIME: 'traffic_audit_sender_last_success_unixtime',
 } as const;
 
 export type TMetricNames = typeof METRIC_NAMES;

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
 
 import { PrismaModule } from '@common/database';
 
@@ -11,7 +12,7 @@ import { TrafficAuditCredentialModule } from './credentials';
 import { TrafficAuditMetricsService } from './traffic-audit-metrics.service';
 
 @Module({
-    imports: [PrismaModule, TrafficAuditCredentialModule],
+    imports: [CqrsModule, PrismaModule, TrafficAuditCredentialModule],
     controllers: [TrafficAuditController, TrafficAuditIngestController],
     providers: [
         TrafficAuditService,

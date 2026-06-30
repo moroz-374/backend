@@ -31,6 +31,7 @@ export const INTERNAL_CACHE_KEYS = {
     NODE_USER_USAGE_KEYS: 'node_user_usage_keys',
     PROCESSING_POSTFIX: ':processing',
     RUNTIME_METRICS: 'runtime_metrics',
+    TRAFFIC_AUDIT_SENDER_METRICS: 'traffic_audit_sender_metrics',
 } as const;
 
 export const INTERNAL_CACHE_KEYS_TTL = {

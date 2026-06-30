@@ -1,0 +1,13 @@
+.git
+.github
+.idea
+.vscode
+node_modules
+dist
+coverage
+test/traffic-audit/e2e
+docker-compose-traffic-audit-e2e.yml
+*.log
+.env
+.env.*
+!.env.sample

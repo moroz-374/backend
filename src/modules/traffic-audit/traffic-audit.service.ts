@@ -79,6 +79,7 @@ export class TrafficAuditService {
 
     public async ingest(nodeUuid: string, body: IngestTrafficLogsDto) {
         const identifiers = [...new Set(body.events.map((event) => event.clientIdentifier))];
+        const uuidIdentifiers = identifiers.filter(isUuid);
 
         const auditedUsers = await this.prisma.users.findMany({
             where: {
@@ -94,11 +95,15 @@ export class TrafficAuditService {
                             in: identifiers,
                         },
                     },
-                    {
-                        uuid: {
-                            in: identifiers,
-                        },
-                    },
+                    ...(uuidIdentifiers.length > 0
+                        ? [
+                              {
+                                  uuid: {
+                                      in: uuidIdentifiers,
+                                  },
+                              },
+                          ]
+                        : []),
                 ],
             },
             select: {
@@ -165,8 +170,12 @@ export class TrafficAuditService {
             discarded: body.events.length - logsToInsert.length,
         };
 
-        this.metrics.recordBatch(nodeUuid, result, body.metrics);
+        await this.metrics.recordBatch(nodeUuid, result, body.metrics);
 
         return result;
     }
+}
+
+function isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
