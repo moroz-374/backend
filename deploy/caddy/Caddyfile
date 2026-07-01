@@ -1,0 +1,9 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$PANEL_DOMAIN}, {$SUB_PUBLIC_DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy remnawave:3000
+}

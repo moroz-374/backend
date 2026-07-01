@@ -19,6 +19,8 @@ sudo ./panel-installer.sh install \
 
 The script checks the host and Docker, downloads `docker-compose-prod.yml` and `.env.sample`, generates all required secrets, validates the rendered Compose configuration, starts the stack, and waits for the panel healthcheck.
 
+The panel application and metrics ports bind to `127.0.0.1` only. To publish the panel with automatic TLS, install the supported [Caddy reverse proxy](caddy-reverse-proxy.md) after the panel is healthy.
+
 ## Upgrade from official Remnawave 2.7.x
 
 Run from any directory; point `--install-dir` at the existing directory if it is not `/opt/remnawave`.
