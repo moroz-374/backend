@@ -1,35 +1,46 @@
 x-common: &common
-  ulimits:
-    nofile:
-      soft: 1048576
-      hard: 1048576
-  restart: always
+  restart: unless-stopped
   networks:
     - remnawave-network
-
-x-logging: &logging
   logging:
     driver: json-file
     options:
       max-size: 100m
-      max-file: 5
-
-x-env: &env
-  env_file: .env
+      max-file: "5"
 
 services:
   remnawave:
-    image: remnawave/backend:2
+    image: ghcr.io/moroz-374/remnawave-backend:${REMNAWAVE_VERSION:-2.7.4-traffic-audit.1}
     container_name: remnawave
     hostname: remnawave
-    <<: [*common, *logging, *env]
+    <<: *common
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@remnawave-db:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      JWT_AUTH_SECRET: ${JWT_AUTH_SECRET:?JWT_AUTH_SECRET is required}
+      JWT_API_TOKENS_SECRET: ${JWT_API_TOKENS_SECRET:?JWT_API_TOKENS_SECRET is required}
+      PANEL_DOMAIN: ${PANEL_DOMAIN:?PANEL_DOMAIN is required}
+      FRONT_END_DOMAIN: ${FRONT_END_DOMAIN:?FRONT_END_DOMAIN is required}
+      SUB_PUBLIC_DOMAIN: ${SUB_PUBLIC_DOMAIN:?SUB_PUBLIC_DOMAIN is required}
+      METRICS_USER: ${METRICS_USER:?METRICS_USER is required}
+      METRICS_PASS: ${METRICS_PASS:?METRICS_PASS is required}
+      WEBHOOK_SECRET_HEADER: ${WEBHOOK_SECRET_HEADER:?WEBHOOK_SECRET_HEADER is required}
+      TRAFFIC_AUDIT_CLICKHOUSE_URL: http://remnawave-clickhouse:8123
+      TRAFFIC_AUDIT_CLICKHOUSE_USER: ${TRAFFIC_AUDIT_CLICKHOUSE_USER:?TRAFFIC_AUDIT_CLICKHOUSE_USER is required}
+      TRAFFIC_AUDIT_CLICKHOUSE_PASSWORD: ${TRAFFIC_AUDIT_CLICKHOUSE_PASSWORD:?TRAFFIC_AUDIT_CLICKHOUSE_PASSWORD is required}
+      TRAFFIC_AUDIT_CLICKHOUSE_DATABASE: ${TRAFFIC_AUDIT_CLICKHOUSE_DATABASE:?TRAFFIC_AUDIT_CLICKHOUSE_DATABASE is required}
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
     volumes:
       - valkey-socket:/var/run/valkey
     ports:
-      - 127.0.0.1:3000:${APP_PORT:-3000}
-      - 127.0.0.1:3001:${METRICS_PORT:-3001}
+      - "127.0.0.1:${APP_PORT:-3000}:${APP_PORT:-3000}"
+      - "127.0.0.1:${METRICS_PORT:-3001}:${METRICS_PORT:-3001}"
     healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:${METRICS_PORT:-3001}/health']
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:$${METRICS_PORT:-3001}/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -46,61 +57,67 @@ services:
     image: postgres:17.6
     container_name: remnawave-db
     hostname: remnawave-db
-    <<: [*common, *logging, *env]
+    <<: *common
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - TZ=UTC
-    ports:
-      - 127.0.0.1:6767:5432
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      TZ: UTC
     volumes:
       - remnawave-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 3s
-      timeout: 10s
-      retries: 3
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   remnawave-redis:
     image: valkey/valkey:9-alpine
     container_name: remnawave-redis
     hostname: remnawave-redis
-    <<: [*common, *logging]
+    <<: *common
     volumes:
       - valkey-socket:/var/run/valkey
-    command: >
-      valkey-server
-      --save ""
-      --appendonly no
-      --maxmemory-policy noeviction
-      --loglevel warning
-      --unixsocket /var/run/valkey/valkey.sock
-      --unixsocketperm 777
-      --port 0
+    command:
+      - valkey-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory-policy
+      - noeviction
+      - --loglevel
+      - warning
+      - --unixsocket
+      - /var/run/valkey/valkey.sock
+      - --unixsocketperm
+      - "777"
+      - --port
+      - "0"
     healthcheck:
-      test: ['CMD', 'valkey-cli', '-s', '/var/run/valkey/valkey.sock', 'ping']
+      test: ["CMD", "valkey-cli", "-s", "/var/run/valkey/valkey.sock", "ping"]
       interval: 3s
       timeout: 3s
-      retries: 3
+      retries: 10
 
   remnawave-clickhouse:
     image: clickhouse:26.3.15.4
     container_name: remnawave-clickhouse
     hostname: remnawave-clickhouse
-    <<: [*common, *logging]
+    <<: *common
     environment:
-      CLICKHOUSE_DB: ${TRAFFIC_AUDIT_CLICKHOUSE_DATABASE:-remnawave}
-      CLICKHOUSE_USER: ${TRAFFIC_AUDIT_CLICKHOUSE_USER:-remnawave}
-      CLICKHOUSE_PASSWORD: ${TRAFFIC_AUDIT_CLICKHOUSE_PASSWORD}
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      CLICKHOUSE_DB: ${TRAFFIC_AUDIT_CLICKHOUSE_DATABASE:?TRAFFIC_AUDIT_CLICKHOUSE_DATABASE is required}
+      CLICKHOUSE_USER: ${TRAFFIC_AUDIT_CLICKHOUSE_USER:?TRAFFIC_AUDIT_CLICKHOUSE_USER is required}
+      CLICKHOUSE_PASSWORD: ${TRAFFIC_AUDIT_CLICKHOUSE_PASSWORD:?TRAFFIC_AUDIT_CLICKHOUSE_PASSWORD is required}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
       TZ: UTC
     volumes:
       - remnawave-clickhouse-data:/var/lib/clickhouse
     healthcheck:
       test:
         [
-          'CMD-SHELL',
+          "CMD-SHELL",
           'clickhouse-client --user "$${CLICKHOUSE_USER}" --password "$${CLICKHOUSE_PASSWORD}" --query "SELECT 1"',
         ]
       interval: 5s
@@ -112,18 +129,11 @@ networks:
   remnawave-network:
     name: remnawave-network
     driver: bridge
-    external: false
 
 volumes:
   remnawave-db-data:
     name: remnawave-db-data
-    driver: local
-    external: false
   valkey-socket:
     name: valkey-socket
-    driver: local
-    external: false
   remnawave-clickhouse-data:
     name: remnawave-clickhouse-data
-    driver: local
-    external: false
