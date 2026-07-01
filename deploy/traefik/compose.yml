@@ -1,0 +1,40 @@
+services:
+  traefik:
+    image: traefik:v3.7.5
+    container_name: remnawave-traefik
+    restart: unless-stopped
+    environment:
+      PANEL_DOMAIN: ${PANEL_DOMAIN:?PANEL_DOMAIN is required}
+      SUB_PUBLIC_DOMAIN: ${SUB_PUBLIC_DOMAIN:?SUB_PUBLIC_DOMAIN is required}
+      TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./dynamic:/etc/traefik/dynamic:ro
+      - traefik-acme:/letsencrypt
+    networks:
+      - remnawave-network
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: "5"
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  remnawave-network:
+    name: remnawave-network
+    external: true
+
+volumes:
+  traefik-acme:
+    name: remnawave-traefik-acme

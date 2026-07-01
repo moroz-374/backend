@@ -1,0 +1,23 @@
+http:
+  routers:
+    panel:
+      rule: "Host(`__PANEL_DOMAIN__`)"
+      entryPoints:
+        - websecure
+      service: remnawave
+      tls:
+        certResolver: le
+    subscription:
+      rule: "Host(`__SUB_PUBLIC_DOMAIN__`)"
+      entryPoints:
+        - websecure
+      service: remnawave
+      tls:
+        certResolver: le
+
+  services:
+    remnawave:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://remnawave:3000"
