@@ -23,6 +23,9 @@ export type INodesWithResolvedInbounds = Prisma.NodesGetPayload<{
             };
         };
         provider: true;
+        trafficAuditCredential: {
+            select: { credentialId: true };
+        };
     };
 }>;
 
@@ -33,6 +36,9 @@ const INCLUDE_RESOLVED_INBOUNDS = {
         },
     },
     provider: true,
+    trafficAuditCredential: {
+        select: { credentialId: true },
+    },
 } as const;
 
 @Injectable()

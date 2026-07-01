@@ -46,6 +46,7 @@ export const NodesSchema = z.object({
     providerUuid: z.nullable(z.string().uuid()),
     provider: z.nullable(PartialInfraProviderSchema),
     activePluginUuid: z.nullable(z.string().uuid()),
+    isTrafficAuditConfigured: z.boolean(),
     system: z.nullable(NodeSystemSchema),
     versions: z.nullable(
         z.object({

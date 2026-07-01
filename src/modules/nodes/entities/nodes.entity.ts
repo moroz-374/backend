@@ -37,6 +37,7 @@ export class NodesEntity implements Nodes {
     public providerUuid: string | null;
     public provider: InfraProviderEntity | null;
     public activePluginUuid: string | null;
+    public isTrafficAuditConfigured: boolean;
 
     constructor(node: Partial<INodesWithResolvedInbounds & Nodes>) {
         Object.assign(this, node);
@@ -52,6 +53,8 @@ export class NodesEntity implements Nodes {
         if (node.provider) {
             this.provider = new InfraProviderEntity(node.provider);
         }
+
+        this.isTrafficAuditConfigured = Boolean(node.trafficAuditCredential);
 
         return this;
     }

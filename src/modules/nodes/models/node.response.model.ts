@@ -36,6 +36,7 @@ export class NodeResponseModel {
     public providerUuid: string | null;
     public provider: InfraProviderEntity | null;
     public activePluginUuid: string | null;
+    public isTrafficAuditConfigured: boolean;
 
     public xrayUptime: number;
     public usersOnline: number;
@@ -75,6 +76,7 @@ export class NodeResponseModel {
         this.providerUuid = data.providerUuid;
         this.provider = data.provider;
         this.activePluginUuid = data.activePluginUuid;
+        this.isTrafficAuditConfigured = data.isTrafficAuditConfigured;
 
         this.system = hotCache.system;
         this.usersOnline = hotCache.onlineUsers;
