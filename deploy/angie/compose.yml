@@ -1,0 +1,39 @@
+services:
+  angie:
+    image: docker.angie.software/angie:1.11.8-templated
+    container_name: remnawave-angie
+    restart: unless-stopped
+    environment:
+      PANEL_DOMAIN: ${PANEL_DOMAIN:?PANEL_DOMAIN is required}
+      SUB_PUBLIC_DOMAIN: ${SUB_PUBLIC_DOMAIN:?SUB_PUBLIC_DOMAIN is required}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./remnawave.conf.template:/etc/angie/templates/http.d/default.conf:ro
+      - angie-acme:/var/lib/angie/acme
+    networks:
+      - remnawave-network
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1 && angie -t -q"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: "5"
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  remnawave-network:
+    name: remnawave-network
+    external: true
+
+volumes:
+  angie-acme:
+    name: remnawave-angie-acme
