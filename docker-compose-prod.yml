@@ -10,7 +10,7 @@ x-common: &common
 
 services:
   remnawave:
-    image: ghcr.io/moroz-374/remnawave-backend:${REMNAWAVE_VERSION:-2.7.4-traffic-audit.1}
+    image: ghcr.io/moroz-374/remnawave-backend:${REMNAWAVE_VERSION:-2.7.4-traffic-audit.2}
     container_name: remnawave
     hostname: remnawave
     <<: *common

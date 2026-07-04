@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 PROGRAM=${0##*/}
 MODE=
-VERSION=${REMNAWAVE_VERSION:-2.7.4-traffic-audit.1}
+VERSION=${REMNAWAVE_VERSION:-2.7.4-traffic-audit.2}
 INSTALL_DIR=${REMNAWAVE_INSTALL_DIR:-/opt/remnawave}
 ASSET_BASE_URL=${REMNAWAVE_ASSET_BASE_URL:-https://raw.githubusercontent.com/moroz-374/backend}
 PANEL_DOMAIN_VALUE=
@@ -70,11 +70,11 @@ validate_inputs() {
 
 preflight() {
   [[ -r /etc/os-release ]] || fail "/etc/os-release is unavailable; only Ubuntu and Debian are supported"
-  # shellcheck disable=SC1091
-  . /etc/os-release
-  case "${ID:-}" in
+  local os_id
+  os_id="$(. /etc/os-release && printf '%s' "${ID:-}")"
+  case "$os_id" in
     ubuntu|debian) ;;
-    *) fail "unsupported operating system: ${ID:-unknown}; use Ubuntu or Debian" ;;
+    *) fail "unsupported operating system: ${os_id:-unknown}; use Ubuntu or Debian" ;;
   esac
   case "$(uname -m)" in
     x86_64|aarch64|arm64) ;;

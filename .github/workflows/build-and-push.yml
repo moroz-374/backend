@@ -6,7 +6,7 @@ on:
       version:
         description: Version from release/release-contract.json
         required: true
-        default: 2.7.4-traffic-audit.1
+        default: 2.7.4-traffic-audit.2
         type: string
       frontend_ref:
         description: Frontend branch, tag, or commit to include
@@ -254,24 +254,16 @@ jobs:
         with:
           subject-path: artifacts/remnawave-source-${{ inputs.version }}.tar.gz
 
-      - name: Create immutable GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ inputs.version }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && {
-            echo "Release $VERSION already exists; refusing to replace immutable assets." >&2
-            exit 1
-          }
-          gh release create "$VERSION" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "${{ steps.source.outputs.backend_sha }}" \
-            --title "$VERSION" \
-            --notes-file artifacts/release-notes.md \
-            "artifacts/remnawave-source-${VERSION}.tar.gz" \
-            "artifacts/release-manifest-${VERSION}.json"
+      - name: Export attested release assets for owner publication
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ inputs.version }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            artifacts/remnawave-source-${{ inputs.version }}.tar.gz
+            artifacts/release-manifest-${{ inputs.version }}.json
+            artifacts/release-notes.md
 
       - name: Publish job summary
         env:

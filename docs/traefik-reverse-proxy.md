@@ -1,6 +1,6 @@
 # Traefik reverse proxy
 
-This is the supported automatic-TLS Traefik variant for Remnawave Traffic Audit release `2.7.4-traffic-audit.1`. It uses the pinned official `traefik:v3.7.5` image and the existing `remnawave-network` created by the panel Compose project.
+This is the supported automatic-TLS Traefik variant for Remnawave Traffic Audit release `2.7.4-traffic-audit.2`. It uses the pinned official `traefik:v3.7.5` image and the existing `remnawave-network` created by the panel Compose project.
 
 ## Prerequisites
 
@@ -18,7 +18,7 @@ Download all files from the same immutable backend release tag as the panel:
 
 ```bash
 sudo install -d -m 0755 /opt/remnawave/traefik/dynamic
-base=https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.1
+base=https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.2
 sudo curl -fsSLo /opt/remnawave/traefik/compose.yml "$base/deploy/traefik/compose.yml"
 sudo curl -fsSLo /opt/remnawave/traefik/traefik.yml "$base/deploy/traefik/traefik.yml"
 sudo curl -fsSLo /opt/remnawave/traefik/render-config.sh "$base/deploy/traefik/render-config.sh"

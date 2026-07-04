@@ -1,6 +1,6 @@
 # Caddy reverse proxy
 
-This is the supported automatic-TLS proxy variant for Remnawave Traffic Audit release `2.7.4-traffic-audit.1`. It uses the pinned official `caddy:2.10.2-alpine` image and the existing `remnawave-network` created by the panel Compose project.
+This is the supported automatic-TLS proxy variant for Remnawave Traffic Audit release `2.7.4-traffic-audit.2`. It uses the pinned official `caddy:2.10.2-alpine` image and the existing `remnawave-network` created by the panel Compose project.
 
 ## Prerequisites
 
@@ -19,11 +19,11 @@ Download the files from the same immutable backend release tag as the panel:
 ```bash
 sudo install -d -m 0755 /opt/remnawave/caddy
 sudo curl -fsSLo /opt/remnawave/caddy/compose.yml \
-  https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.1/deploy/caddy/compose.yml
+  https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.2/deploy/caddy/compose.yml
 sudo curl -fsSLo /opt/remnawave/caddy/Caddyfile \
-  https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.1/deploy/caddy/Caddyfile
+  https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.2/deploy/caddy/Caddyfile
 sudo curl -fsSLo /opt/remnawave/caddy/.env \
-  https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.1/deploy/caddy/.env.sample
+  https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.2/deploy/caddy/.env.sample
 sudo chmod 0600 /opt/remnawave/caddy/.env
 sudoedit /opt/remnawave/caddy/.env
 ```
