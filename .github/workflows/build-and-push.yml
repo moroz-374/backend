@@ -261,11 +261,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh release view "$VERSION" >/dev/null 2>&1 && {
+          gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && {
             echo "Release $VERSION already exists; refusing to replace immutable assets." >&2
             exit 1
           }
           gh release create "$VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
             --target "${{ steps.source.outputs.backend_sha }}" \
             --title "$VERSION" \
             --notes-file artifacts/release-notes.md \
