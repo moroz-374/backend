@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "2.7.4-traffic-audit.2",
+  "version": "2.7.4-traffic-audit.3",
   "registry": "ghcr.io",
   "owner": "moroz-374",
   "channelTag": "stable",

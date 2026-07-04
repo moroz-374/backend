@@ -6,7 +6,7 @@ on:
       version:
         description: Version from release/release-contract.json
         required: true
-        default: 2.7.4-traffic-audit.2
+        default: 2.7.4-traffic-audit.3
         type: string
       frontend_ref:
         description: Frontend branch, tag, or commit to include
@@ -197,7 +197,7 @@ jobs:
           labels: |
             org.opencontainers.image.created=${{ steps.source.outputs.build_time }}
           build-args: |
-            BRANCH=feature/traffic-audit
+            BRANCH=main
             __RW_METADATA_VERSION=${{ inputs.version }}
             __RW_METADATA_GIT_BACKEND_COMMIT=${{ steps.source.outputs.backend_sha }}
             __RW_METADATA_GIT_FRONTEND_COMMIT=${{ steps.source.outputs.frontend_sha }}

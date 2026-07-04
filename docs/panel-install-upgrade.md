@@ -8,10 +8,10 @@ The installer downloads versioned files from the matching backend Git tag. The d
 
 ```bash
 curl -fsSLo panel-installer.sh \
-  https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.2/scripts/panel-installer.sh
+  https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.3/scripts/panel-installer.sh
 chmod +x panel-installer.sh
 sudo ./panel-installer.sh install \
-  --version 2.7.4-traffic-audit.2 \
+  --version 2.7.4-traffic-audit.3 \
   --panel-domain panel.example.com \
   --frontend-domain panel.example.com \
   --subscription-domain sub.example.com
@@ -27,7 +27,7 @@ Run from any directory; point `--install-dir` at the existing directory if it is
 
 ```bash
 sudo ./panel-installer.sh upgrade \
-  --version 2.7.4-traffic-audit.2 \
+  --version 2.7.4-traffic-audit.3 \
   --install-dir /opt/remnawave
 ```
 

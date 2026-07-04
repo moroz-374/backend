@@ -71,7 +71,7 @@ $backendArgs = @(
     '--platform', 'linux/amd64,linux/arm64',
     '--file', (Join-Path $root 'backend/Dockerfile.release'),
     '--build-context', "frontend-source=$(Join-Path $root 'frontend')",
-    '--build-arg', 'BRANCH=feature/traffic-audit',
+    '--build-arg', 'BRANCH=main',
     '--build-arg', "__RW_METADATA_VERSION=$Version",
     '--build-arg', "__RW_METADATA_GIT_BACKEND_COMMIT=$backendCommit",
     '--build-arg', "__RW_METADATA_GIT_FRONTEND_COMMIT=$frontendCommit",

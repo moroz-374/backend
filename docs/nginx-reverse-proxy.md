@@ -1,6 +1,6 @@
 # Nginx reverse proxy
 
-This is the supported file-based TLS proxy variant for Remnawave Traffic Audit release `2.7.4-traffic-audit.2`. It uses the pinned official `nginx:1.30.3-alpine-slim` image, Certbot on the host and the existing `remnawave-network` created by the panel Compose project.
+This is the supported file-based TLS proxy variant for Remnawave Traffic Audit release `2.7.4-traffic-audit.3`. It uses the pinned official `nginx:1.30.3-alpine-slim` image, Certbot on the host and the existing `remnawave-network` created by the panel Compose project.
 
 ## Prerequisites
 
@@ -20,11 +20,11 @@ Download all proxy files from the same immutable backend release tag as the pane
 ```bash
 sudo install -d -m 0755 /opt/remnawave/nginx/acme
 sudo curl -fsSLo /opt/remnawave/nginx/compose.yml \
-  https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.2/deploy/nginx/compose.yml
+  https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.3/deploy/nginx/compose.yml
 sudo curl -fsSLo /opt/remnawave/nginx/remnawave.conf.template \
-  https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.2/deploy/nginx/remnawave.conf.template
+  https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.3/deploy/nginx/remnawave.conf.template
 sudo curl -fsSLo /opt/remnawave/nginx/.env \
-  https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.2/deploy/nginx/.env.sample
+  https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.3/deploy/nginx/.env.sample
 sudo chmod 0600 /opt/remnawave/nginx/.env
 sudoedit /opt/remnawave/nginx/.env
 ```
