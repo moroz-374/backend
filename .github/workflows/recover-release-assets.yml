@@ -115,21 +115,13 @@ jobs:
         with:
           subject-path: artifacts/remnawave-source-${{ inputs.version }}.tar.gz
 
-      - name: Create immutable GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ inputs.version }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $VERSION already exists; refusing to replace immutable assets." >&2
-            exit 1
-          fi
-          gh release create "$VERSION" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "${{ inputs.backend_ref }}" \
-            --title "$VERSION" \
-            --notes-file artifacts/release-notes.md \
-            "artifacts/remnawave-source-${VERSION}.tar.gz" \
-            "artifacts/release-manifest-${VERSION}.json"
+      - name: Upload attested release assets for owner publication
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ inputs.version }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            artifacts/remnawave-source-${{ inputs.version }}.tar.gz
+            artifacts/release-manifest-${{ inputs.version }}.json
+            artifacts/release-notes.md
