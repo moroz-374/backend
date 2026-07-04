@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 PROGRAM=${0##*/}
 MODE=
-VERSION=${REMNAWAVE_VERSION:-2.7.4-traffic-audit.3}
+VERSION=${REMNAWAVE_VERSION:-2.7.4-traffic-audit.4}
 INSTALL_DIR=${REMNAWAVE_INSTALL_DIR:-/opt/remnawave}
 ASSET_BASE_URL=${REMNAWAVE_ASSET_BASE_URL:-https://raw.githubusercontent.com/moroz-374/backend}
 PANEL_DOMAIN_VALUE=
