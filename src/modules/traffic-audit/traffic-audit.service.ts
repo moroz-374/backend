@@ -80,6 +80,9 @@ export class TrafficAuditService {
     public async ingest(nodeUuid: string, body: IngestTrafficLogsDto) {
         const identifiers = [...new Set(body.events.map((event) => event.clientIdentifier))];
         const uuidIdentifiers = identifiers.filter(isUuid);
+        const numericIdentifiers = identifiers
+            .filter((identifier) => /^\d+$/.test(identifier))
+            .map((identifier) => BigInt(identifier));
 
         const auditedUsers = await this.prisma.users.findMany({
             where: {
@@ -97,12 +100,21 @@ export class TrafficAuditService {
                     },
                     ...(uuidIdentifiers.length > 0
                         ? [
-                              {
-                                  uuid: {
-                                      in: uuidIdentifiers,
-                                  },
-                              },
-                          ]
+                            {
+                                uuid: {
+                                    in: uuidIdentifiers,
+                                },
+                            },
+                        ]
+                        : []),
+                    ...(numericIdentifiers.length > 0
+                        ? [
+                            {
+                                tId: {
+                                    in: numericIdentifiers,
+                                },
+                            },
+                        ]
                         : []),
                 ],
             },
@@ -127,6 +139,7 @@ export class TrafficAuditService {
 
             identifierToUser.set(user.username, user);
             identifierToUser.set(user.uuid, user);
+            identifierToUser.set(user.tId.toString(), user);
         }
 
         const logsToInsert = body.events.flatMap((event) => {
