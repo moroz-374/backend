@@ -1,6 +1,6 @@
 # Angie reverse proxy
 
-This is the supported automatic-TLS Angie variant for Remnawave Traffic Audit release `2.7.4-traffic-audit.4`. It uses the pinned official `docker.angie.software/angie:1.11.8-templated` image, Angie's built-in open-source ACME module and the existing `remnawave-network` created by the panel Compose project.
+This is the supported automatic-TLS Angie variant for Remnawave Traffic Audit release `2.7.4-traffic-audit.6`. It uses the pinned official `docker.angie.software/angie:1.11.8-templated` image, Angie's built-in open-source ACME module and the existing `remnawave-network` created by the panel Compose project.
 
 ## Prerequisites
 
@@ -18,7 +18,7 @@ Download the files from the same immutable backend release tag as the panel:
 
 ```bash
 sudo install -d -m 0755 /opt/remnawave/angie
-base=https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.4
+base=https://raw.githubusercontent.com/moroz-374/backend/2.7.4-traffic-audit.6
 sudo curl -fsSLo /opt/remnawave/angie/compose.yml "$base/deploy/angie/compose.yml"
 sudo curl -fsSLo /opt/remnawave/angie/remnawave.conf.template \
   "$base/deploy/angie/remnawave.conf.template"
