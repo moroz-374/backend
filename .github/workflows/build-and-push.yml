@@ -119,11 +119,23 @@ jobs:
 
       - name: Validate Docker build definitions
         run: |
+          xray_repository="$(jq -r '.sources.xray.repository' backend/release/release-contract.json)"
+          xray_version="$(jq -r '.sources.xray.version' backend/release/release-contract.json)"
+          xray_revision="$(jq -r '.sources.xray.revision' backend/release/release-contract.json)"
+          xray_amd64_sha256="$(jq -r '.sources.xray.assets.linuxAmd64.sha256' backend/release/release-contract.json)"
+          xray_arm64_sha256="$(jq -r '.sources.xray.assets.linuxArm64.sha256' backend/release/release-contract.json)"
           docker buildx build --call=check \
             --file backend/Dockerfile.release \
             --build-context frontend-source=frontend \
             backend
-          docker buildx build --call=check --file node/Dockerfile node
+          docker buildx build --call=check \
+            --file node/Dockerfile \
+            --build-arg "XRAY_CORE_REPOSITORY=$xray_repository" \
+            --build-arg "XRAY_CORE_VERSION=$xray_version" \
+            --build-arg "XRAY_CORE_REVISION=$xray_revision" \
+            --build-arg "XRAY_CORE_AMD64_SHA256=$xray_amd64_sha256" \
+            --build-arg "XRAY_CORE_ARM64_SHA256=$xray_arm64_sha256" \
+            node
 
   publish:
     name: Publish immutable images and release assets
@@ -167,6 +179,11 @@ jobs:
             echo "backend_sha=$(git -C backend rev-parse HEAD)"
             echo "frontend_sha=$(git -C frontend rev-parse HEAD)"
             echo "node_sha=$(git -C node rev-parse HEAD)"
+            echo "xray_repository=$(jq -r '.sources.xray.repository' backend/release/release-contract.json)"
+            echo "xray_version=$(jq -r '.sources.xray.version' backend/release/release-contract.json)"
+            echo "xray_revision=$(jq -r '.sources.xray.revision' backend/release/release-contract.json)"
+            echo "xray_amd64_sha256=$(jq -r '.sources.xray.assets.linuxAmd64.sha256' backend/release/release-contract.json)"
+            echo "xray_arm64_sha256=$(jq -r '.sources.xray.assets.linuxArm64.sha256' backend/release/release-contract.json)"
             echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           } >> "$GITHUB_OUTPUT"
 
@@ -220,6 +237,17 @@ jobs:
             org.opencontainers.image.created=${{ steps.source.outputs.build_time }}
             org.opencontainers.image.version=${{ inputs.version }}
             org.opencontainers.image.revision=${{ steps.source.outputs.node_sha }}
+            org.remnawave.xray.repository=${{ steps.source.outputs.xray_repository }}
+            org.remnawave.xray.version=${{ steps.source.outputs.xray_version }}
+            org.remnawave.xray.revision=${{ steps.source.outputs.xray_revision }}
+            org.remnawave.xray.asset.linux-amd64.sha256=${{ steps.source.outputs.xray_amd64_sha256 }}
+            org.remnawave.xray.asset.linux-arm64.sha256=${{ steps.source.outputs.xray_arm64_sha256 }}
+          build-args: |
+            XRAY_CORE_REPOSITORY=${{ steps.source.outputs.xray_repository }}
+            XRAY_CORE_VERSION=${{ steps.source.outputs.xray_version }}
+            XRAY_CORE_REVISION=${{ steps.source.outputs.xray_revision }}
+            XRAY_CORE_AMD64_SHA256=${{ steps.source.outputs.xray_amd64_sha256 }}
+            XRAY_CORE_ARM64_SHA256=${{ steps.source.outputs.xray_arm64_sha256 }}
           provenance: mode=max
           sbom: true
 
@@ -244,6 +272,11 @@ jobs:
           BACKEND_SHA: ${{ steps.source.outputs.backend_sha }}
           FRONTEND_SHA: ${{ steps.source.outputs.frontend_sha }}
           NODE_SHA: ${{ steps.source.outputs.node_sha }}
+          XRAY_REPOSITORY: ${{ steps.source.outputs.xray_repository }}
+          XRAY_VERSION: ${{ steps.source.outputs.xray_version }}
+          XRAY_REVISION: ${{ steps.source.outputs.xray_revision }}
+          XRAY_AMD64_SHA256: ${{ steps.source.outputs.xray_amd64_sha256 }}
+          XRAY_ARM64_SHA256: ${{ steps.source.outputs.xray_arm64_sha256 }}
           BACKEND_DIGEST: ${{ steps.backend.outputs.digest }}
           NODE_DIGEST: ${{ steps.node_image.outputs.digest }}
         shell: bash

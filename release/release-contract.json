@@ -20,6 +20,23 @@
     "node": {
       "url": "https://github.com/moroz-374/node",
       "upstreamVersion": "2.7.0"
+    },
+    "xray": {
+      "url": "https://github.com/moroz-374/Xray-core",
+      "upstreamVersion": "v26.3.27",
+      "repository": "moroz-374/Xray-core",
+      "version": "v26.3.27-rw.1-rc.1",
+      "revision": "d69534e75e12bd901671a87f0edf5709db98edd9",
+      "assets": {
+        "linuxAmd64": {
+          "name": "Xray-linux-64.zip",
+          "sha256": "84493d09e23a24812dd021dcdc8189dc20a59ec8ad7474c24afa23b3c452f55f"
+        },
+        "linuxArm64": {
+          "name": "Xray-linux-arm64-v8a.zip",
+          "sha256": "597a747f5e542623ee09c54dec87a9b8c07badbc71ab94db429f4b84ca0dc6b9"
+        }
+      }
     }
   }
 }

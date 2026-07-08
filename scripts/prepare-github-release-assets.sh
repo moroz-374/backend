@@ -6,6 +6,11 @@ set -euo pipefail
 : "${BACKEND_SHA:?BACKEND_SHA is required}"
 : "${FRONTEND_SHA:?FRONTEND_SHA is required}"
 : "${NODE_SHA:?NODE_SHA is required}"
+: "${XRAY_REPOSITORY:?XRAY_REPOSITORY is required}"
+: "${XRAY_VERSION:?XRAY_VERSION is required}"
+: "${XRAY_REVISION:?XRAY_REVISION is required}"
+: "${XRAY_AMD64_SHA256:?XRAY_AMD64_SHA256 is required}"
+: "${XRAY_ARM64_SHA256:?XRAY_ARM64_SHA256 is required}"
 : "${BACKEND_DIGEST:?BACKEND_DIGEST is required}"
 : "${NODE_DIGEST:?NODE_DIGEST is required}"
 
@@ -22,6 +27,11 @@ bundle_root="$(mktemp -d)"
 trap 'rm -rf "$bundle_root"' EXIT
 
 test "$(jq -r '.version' "$contract")" = "$VERSION"
+test "$(jq -r '.sources.xray.repository' "$contract")" = "$XRAY_REPOSITORY"
+test "$(jq -r '.sources.xray.version' "$contract")" = "$XRAY_VERSION"
+test "$(jq -r '.sources.xray.revision' "$contract")" = "$XRAY_REVISION"
+test "$(jq -r '.sources.xray.assets.linuxAmd64.sha256' "$contract")" = "$XRAY_AMD64_SHA256"
+test "$(jq -r '.sources.xray.assets.linuxArm64.sha256' "$contract")" = "$XRAY_ARM64_SHA256"
 mkdir -p "$artifacts" "$bundle_root/remnawave-source-$VERSION"
 
 for repository in backend frontend node; do
@@ -39,8 +49,16 @@ jq -n \
   --arg backend "$BACKEND_SHA" \
   --arg frontend "$FRONTEND_SHA" \
   --arg node "$NODE_SHA" \
+  --arg xrayRepository "$XRAY_REPOSITORY" \
+  --arg xrayVersion "$XRAY_VERSION" \
+  --arg xrayRevision "$XRAY_REVISION" \
   '{schemaVersion: 1, version: $version, createdAt: $createdAt,
-    repositories: {backend: $backend, frontend: $frontend, node: $node}}' \
+    repositories: {
+      backend: $backend,
+      frontend: $frontend,
+      node: $node,
+      xray: {repository: $xrayRepository, version: $xrayVersion, revision: $xrayRevision}
+    }}' \
   > "$bundle_root/remnawave-source-$VERSION/SOURCES.json"
 
 tar -czf "$artifacts/remnawave-source-$VERSION.tar.gz" \
@@ -54,12 +72,21 @@ jq -n \
   --arg backendUrl "$(jq -r '.sources.backend.url' "$contract")" \
   --arg frontendUrl "$(jq -r '.sources.frontend.url' "$contract")" \
   --arg nodeUrl "$(jq -r '.sources.node.url' "$contract")" \
+  --arg xrayUrl "$(jq -r '.sources.xray.url' "$contract")" \
   --arg backendUpstream "$(jq -r '.sources.backend.upstreamVersion' "$contract")" \
   --arg frontendUpstream "$(jq -r '.sources.frontend.upstreamVersion' "$contract")" \
   --arg nodeUpstream "$(jq -r '.sources.node.upstreamVersion' "$contract")" \
+  --arg xrayUpstream "$(jq -r '.sources.xray.upstreamVersion' "$contract")" \
   --arg backendCommit "$BACKEND_SHA" \
   --arg frontendCommit "$FRONTEND_SHA" \
   --arg nodeCommit "$NODE_SHA" \
+  --arg xrayRepository "$XRAY_REPOSITORY" \
+  --arg xrayVersion "$XRAY_VERSION" \
+  --arg xrayRevision "$XRAY_REVISION" \
+  --arg xrayAmd64Asset "$(jq -r '.sources.xray.assets.linuxAmd64.name' "$contract")" \
+  --arg xrayArm64Asset "$(jq -r '.sources.xray.assets.linuxArm64.name' "$contract")" \
+  --arg xrayAmd64Sha256 "$XRAY_AMD64_SHA256" \
+  --arg xrayArm64Sha256 "$XRAY_ARM64_SHA256" \
   --arg backendRepository "$(jq -r '.images.backend' "$contract")" \
   --arg nodeRepository "$(jq -r '.images.node' "$contract")" \
   --arg backendDigest "$BACKEND_DIGEST" \
@@ -71,11 +98,36 @@ jq -n \
     sources: {
       backend: {url: $backendUrl, upstreamVersion: $backendUpstream, commit: $backendCommit},
       frontend: {url: $frontendUrl, upstreamVersion: $frontendUpstream, commit: $frontendCommit},
-      node: {url: $nodeUrl, upstreamVersion: $nodeUpstream, commit: $nodeCommit}
+      node: {url: $nodeUrl, upstreamVersion: $nodeUpstream, commit: $nodeCommit},
+      xray: {
+        url: $xrayUrl,
+        upstreamVersion: $xrayUpstream,
+        repository: $xrayRepository,
+        version: $xrayVersion,
+        revision: $xrayRevision,
+        assets: {
+          linuxAmd64: {name: $xrayAmd64Asset, sha256: $xrayAmd64Sha256},
+          linuxArm64: {name: $xrayArm64Asset, sha256: $xrayArm64Sha256}
+        }
+      }
     },
     images: {
       backend: {repository: $backendRepository, immutableTag: ($backendRepository + ":" + $version), digest: $backendDigest, platforms: ["linux/amd64", "linux/arm64"], sbom: "spdx", provenance: "slsa-max"},
-      node: {repository: $nodeRepository, immutableTag: ($nodeRepository + ":" + $version), digest: $nodeDigest, platforms: ["linux/amd64", "linux/arm64"], sbom: "spdx", provenance: "slsa-max"}
+      node: {
+        repository: $nodeRepository,
+        immutableTag: ($nodeRepository + ":" + $version),
+        digest: $nodeDigest,
+        platforms: ["linux/amd64", "linux/arm64"],
+        sbom: "spdx",
+        provenance: "slsa-max",
+        xray: {
+          repository: $xrayRepository,
+          version: $xrayVersion,
+          revision: $xrayRevision,
+          linuxAmd64Sha256: $xrayAmd64Sha256,
+          linuxArm64Sha256: $xrayArm64Sha256
+        }
+      }
     },
     sourceBundle: {archive: $sourceArchive, sha256: $sourceSha256}}' \
   > "$artifacts/release-manifest-$VERSION.json"
@@ -85,6 +137,7 @@ Traffic-audit release \`$VERSION\`.
 
 - Backend: \`$(jq -r '.images.backend' "$contract")@$BACKEND_DIGEST\`
 - Node: \`$(jq -r '.images.node' "$contract")@$NODE_DIGEST\`
+- Xray: \`$XRAY_REPOSITORY@$XRAY_REVISION\` (\`$XRAY_VERSION\`)
 - Corresponding source: \`remnawave-source-$VERSION.tar.gz\`
 - The mutable \`stable\` tag is not updated by this release workflow.
 EOF

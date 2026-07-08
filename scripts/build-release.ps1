@@ -64,6 +64,12 @@ $nodeCommit = (git -C (Join-Path $root 'node') rev-parse HEAD).Trim()
 $buildTime = [DateTimeOffset]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
 $backendImage = $contract.images.backend
 $nodeImage = $contract.images.node
+$xray = $contract.sources.xray
+$xrayRepository = [string]$xray.repository
+$xrayVersion = [string]$xray.version
+$xrayRevision = [string]$xray.revision
+$xrayAmd64Sha256 = [string]$xray.assets.linuxAmd64.sha256
+$xrayArm64Sha256 = [string]$xray.assets.linuxArm64.sha256
 
 $backendArgs = @(
     'build',
@@ -95,6 +101,16 @@ $nodeArgs = @(
     '--label', "org.opencontainers.image.created=$buildTime",
     '--label', "org.opencontainers.image.version=$Version",
     '--label', "org.opencontainers.image.revision=$nodeCommit",
+    '--label', "org.remnawave.xray.repository=$xrayRepository",
+    '--label', "org.remnawave.xray.version=$xrayVersion",
+    '--label', "org.remnawave.xray.revision=$xrayRevision",
+    '--label', "org.remnawave.xray.asset.linux-amd64.sha256=$xrayAmd64Sha256",
+    '--label', "org.remnawave.xray.asset.linux-arm64.sha256=$xrayArm64Sha256",
+    '--build-arg', "XRAY_CORE_REPOSITORY=$xrayRepository",
+    '--build-arg', "XRAY_CORE_VERSION=$xrayVersion",
+    '--build-arg', "XRAY_CORE_REVISION=$xrayRevision",
+    '--build-arg', "XRAY_CORE_AMD64_SHA256=$xrayAmd64Sha256",
+    '--build-arg', "XRAY_CORE_ARM64_SHA256=$xrayArm64Sha256",
     '--tag', "${nodeImage}:$Version",
     '--provenance=mode=max',
     '--sbom=true',
@@ -144,6 +160,23 @@ $manifest = [ordered]@{
             upstreamVersion = $contract.sources.node.upstreamVersion
             commit = $nodeCommit
         }
+        xray = [ordered]@{
+            url = $xray.url
+            upstreamVersion = $xray.upstreamVersion
+            repository = $xrayRepository
+            version = $xrayVersion
+            revision = $xrayRevision
+            assets = [ordered]@{
+                linuxAmd64 = [ordered]@{
+                    name = $xray.assets.linuxAmd64.name
+                    sha256 = $xrayAmd64Sha256
+                }
+                linuxArm64 = [ordered]@{
+                    name = $xray.assets.linuxArm64.name
+                    sha256 = $xrayArm64Sha256
+                }
+            }
+        }
     }
     images = [ordered]@{
         backend = [ordered]@{
@@ -167,6 +200,13 @@ $manifest = [ordered]@{
             archiveSha256 = (Get-FileHash -LiteralPath $nodeArchive -Algorithm SHA256).Hash.ToLowerInvariant()
             sbom = 'spdx'
             provenance = 'slsa-max'
+            xray = [ordered]@{
+                repository = $xrayRepository
+                version = $xrayVersion
+                revision = $xrayRevision
+                linuxAmd64Sha256 = $xrayAmd64Sha256
+                linuxArm64Sha256 = $xrayArm64Sha256
+            }
         }
     }
 }
