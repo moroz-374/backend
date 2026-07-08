@@ -209,6 +209,22 @@ $manifest = [ordered]@{
             }
         }
     }
+    licenseNotice = [ordered]@{
+        combinedImageLicenses = @('AGPL-3.0-only', 'MPL-2.0')
+        remnawave = [ordered]@{
+            license = 'AGPL-3.0-only'
+            appliesTo = @('backend image', 'node application code', 'frontend application code')
+        }
+        xray = [ordered]@{
+            license = 'MPL-2.0'
+            appliesTo = @('bundled Xray-core binary in node image', 'Xray-core fork source modifications')
+            repository = $xrayRepository
+            version = $xrayVersion
+            revision = $xrayRevision
+            noticePathInNodeImage = '/usr/share/doc/remnawave-node/THIRD-PARTY-NOTICES.txt'
+            licensePathInNodeImage = '/usr/share/licenses/xray-core/LICENSE'
+        }
+    }
 }
 
 $manifestJson = $manifest | ConvertTo-Json -Depth 8

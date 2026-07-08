@@ -61,6 +61,27 @@ jq -n \
     }}' \
   > "$bundle_root/remnawave-source-$VERSION/SOURCES.json"
 
+cat > "$bundle_root/remnawave-source-$VERSION/THIRD-PARTY-NOTICES.txt" <<EOF
+Remnawave Traffic Audit release $VERSION license notice
+
+This source bundle contains the AGPL-3.0-only Remnawave sources for backend,
+frontend and node. The released node image also bundles Xray-core as a separate
+component under MPL-2.0.
+
+Bundled Xray-core source:
+- Repository: https://github.com/$XRAY_REPOSITORY
+- Version: $XRAY_VERSION
+- Revision: $XRAY_REVISION
+- Upstream base: $(jq -r '.sources.xray.upstreamVersion' "$contract")
+
+Bundled Xray-core release assets:
+- $(jq -r '.sources.xray.assets.linuxAmd64.name' "$contract"): $XRAY_AMD64_SHA256
+- $(jq -r '.sources.xray.assets.linuxArm64.name' "$contract"): $XRAY_ARM64_SHA256
+
+The Xray-core source tag/revision contains the MPL-2.0 LICENSE, NOTICE and
+PATCHES.md files for the fork-specific changes.
+EOF
+
 tar -czf "$artifacts/remnawave-source-$VERSION.tar.gz" \
   -C "$bundle_root" "remnawave-source-$VERSION"
 source_sha256="$(sha256sum "$artifacts/remnawave-source-$VERSION.tar.gz" | cut -d ' ' -f 1)"
@@ -129,7 +150,23 @@ jq -n \
         }
       }
     },
-    sourceBundle: {archive: $sourceArchive, sha256: $sourceSha256}}' \
+    sourceBundle: {archive: $sourceArchive, sha256: $sourceSha256},
+    licenseNotice: {
+      combinedImageLicenses: ["AGPL-3.0-only", "MPL-2.0"],
+      remnawave: {
+        license: "AGPL-3.0-only",
+        appliesTo: ["backend image", "node application code", "frontend application code"]
+      },
+      xray: {
+        license: "MPL-2.0",
+        appliesTo: ["bundled Xray-core binary in node image", "Xray-core fork source modifications"],
+        repository: $xrayRepository,
+        version: $xrayVersion,
+        revision: $xrayRevision,
+        noticePathInNodeImage: "/usr/share/doc/remnawave-node/THIRD-PARTY-NOTICES.txt",
+        licensePathInNodeImage: "/usr/share/licenses/xray-core/LICENSE"
+      }
+    }}' \
   > "$artifacts/release-manifest-$VERSION.json"
 
 cat > "$artifacts/release-notes.md" <<EOF
@@ -139,5 +176,6 @@ Traffic-audit release \`$VERSION\`.
 - Node: \`$(jq -r '.images.node' "$contract")@$NODE_DIGEST\`
 - Xray: \`$XRAY_REPOSITORY@$XRAY_REVISION\` (\`$XRAY_VERSION\`)
 - Corresponding source: \`remnawave-source-$VERSION.tar.gz\`
+- License notice: Remnawave sources are AGPL-3.0-only; bundled Xray-core in the node image is MPL-2.0 and is documented in \`THIRD-PARTY-NOTICES.txt\`.
 - The mutable \`stable\` tag is not updated by this release workflow.
 EOF

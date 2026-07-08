@@ -91,12 +91,30 @@ jobs:
           test "$(git -C node rev-parse HEAD)" = "${{ inputs.node_ref }}"
           [[ "$BACKEND_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
           [[ "$NODE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          test -n "$(jq -r '.sources.xray.repository' backend/release/release-contract.json)"
+          test -n "$(jq -r '.sources.xray.version' backend/release/release-contract.json)"
+          test -n "$(jq -r '.sources.xray.revision' backend/release/release-contract.json)"
+          test -n "$(jq -r '.sources.xray.assets.linuxAmd64.sha256' backend/release/release-contract.json)"
+          test -n "$(jq -r '.sources.xray.assets.linuxArm64.sha256' backend/release/release-contract.json)"
           backend_actual="sha256:$(docker buildx imagetools inspect \
             "ghcr.io/moroz-374/remnawave-backend:$VERSION" --raw | sha256sum | cut -d ' ' -f 1)"
           node_actual="sha256:$(docker buildx imagetools inspect \
             "ghcr.io/moroz-374/remnawave-node:$VERSION" --raw | sha256sum | cut -d ' ' -f 1)"
           test "$backend_actual" = "$BACKEND_DIGEST"
           test "$node_actual" = "$NODE_DIGEST"
+
+      - name: Capture bundled Xray metadata
+        id: xray
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "repository=$(jq -r '.sources.xray.repository' backend/release/release-contract.json)"
+            echo "version=$(jq -r '.sources.xray.version' backend/release/release-contract.json)"
+            echo "revision=$(jq -r '.sources.xray.revision' backend/release/release-contract.json)"
+            echo "amd64_sha256=$(jq -r '.sources.xray.assets.linuxAmd64.sha256' backend/release/release-contract.json)"
+            echo "arm64_sha256=$(jq -r '.sources.xray.assets.linuxArm64.sha256' backend/release/release-contract.json)"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create corresponding source bundle and release manifest
         env:
@@ -105,6 +123,11 @@ jobs:
           BACKEND_SHA: ${{ inputs.backend_ref }}
           FRONTEND_SHA: ${{ inputs.frontend_ref }}
           NODE_SHA: ${{ inputs.node_ref }}
+          XRAY_REPOSITORY: ${{ steps.xray.outputs.repository }}
+          XRAY_VERSION: ${{ steps.xray.outputs.version }}
+          XRAY_REVISION: ${{ steps.xray.outputs.revision }}
+          XRAY_AMD64_SHA256: ${{ steps.xray.outputs.amd64_sha256 }}
+          XRAY_ARM64_SHA256: ${{ steps.xray.outputs.arm64_sha256 }}
           BACKEND_DIGEST: ${{ inputs.backend_digest }}
           NODE_DIGEST: ${{ inputs.node_digest }}
         shell: bash
