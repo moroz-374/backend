@@ -14,6 +14,11 @@ interface TrafficAuditInsertEvent {
     destinationType: 'DOMAIN' | 'IPV4' | 'IPV6' | 'UNKNOWN';
     network: 'tcp' | 'udp';
     port: number;
+    originalDestination?: string;
+    originalDestinationType?: 'DOMAIN' | 'IPV4' | 'IPV6' | 'UNKNOWN';
+    originalNetwork?: 'tcp' | 'udp';
+    originalPort?: number;
+    sniffedProtocol?: 'http' | 'tls' | 'quic' | 'fakedns' | 'fakedns+others';
     requestedAt: Date;
     clientIdentifier: string;
 }
@@ -66,6 +71,11 @@ export class TrafficAuditClickhouseService implements OnModuleDestroy, OnModuleI
                     destination_type LowCardinality(String),
                     network LowCardinality(String),
                     port UInt16,
+                    original_destination Nullable(String) DEFAULT NULL CODEC(ZSTD(3)),
+                    original_destination_type Nullable(String) DEFAULT NULL,
+                    original_network Nullable(String) DEFAULT NULL,
+                    original_port Nullable(UInt16) DEFAULT NULL,
+                    sniffed_protocol Nullable(String) DEFAULT NULL,
                     requested_at DateTime64(3, 'UTC') CODEC(DoubleDelta, ZSTD(1)),
                     client_identifier String CODEC(ZSTD(3)),
                     created_at DateTime64(3, 'UTC') DEFAULT now64(3)
@@ -79,6 +89,21 @@ export class TrafficAuditClickhouseService implements OnModuleDestroy, OnModuleI
                 wait_end_of_query: 1,
             },
         });
+
+        for (const query of [
+            'ALTER TABLE traffic_logs ADD COLUMN IF NOT EXISTS original_destination Nullable(String) DEFAULT NULL CODEC(ZSTD(3)) AFTER port',
+            'ALTER TABLE traffic_logs ADD COLUMN IF NOT EXISTS original_destination_type Nullable(String) DEFAULT NULL AFTER original_destination',
+            'ALTER TABLE traffic_logs ADD COLUMN IF NOT EXISTS original_network Nullable(String) DEFAULT NULL AFTER original_destination_type',
+            'ALTER TABLE traffic_logs ADD COLUMN IF NOT EXISTS original_port Nullable(UInt16) DEFAULT NULL AFTER original_network',
+            'ALTER TABLE traffic_logs ADD COLUMN IF NOT EXISTS sniffed_protocol Nullable(String) DEFAULT NULL AFTER original_port',
+        ]) {
+            await this.client.command({
+                query,
+                clickhouse_settings: {
+                    wait_end_of_query: 1,
+                },
+            });
+        }
     }
 
     public async onModuleDestroy(): Promise<void> {
@@ -101,6 +126,11 @@ export class TrafficAuditClickhouseService implements OnModuleDestroy, OnModuleI
                 destination_type: event.destinationType,
                 network: event.network,
                 port: event.port,
+                original_destination: event.originalDestination ?? null,
+                original_destination_type: event.originalDestinationType ?? null,
+                original_network: event.originalNetwork ?? null,
+                original_port: event.originalPort ?? null,
+                sniffed_protocol: event.sniffedProtocol ?? null,
                 requested_at: event.requestedAt.toISOString(),
                 client_identifier: event.clientIdentifier,
             })),

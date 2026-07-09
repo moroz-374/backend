@@ -142,6 +142,11 @@ test('ingest rejects queued events captured before audit was enabled', async () 
                 destinationType: 'DOMAIN',
                 network: 'tcp',
                 port: 443,
+                originalDestination: '203.0.113.20',
+                originalDestinationType: 'IPV4',
+                originalNetwork: 'tcp',
+                originalPort: 443,
+                sniffedProtocol: 'tls',
                 requestedAt: '2026-06-27T15:00:00.000Z',
             },
         ],
@@ -157,6 +162,11 @@ test('ingest rejects queued events captured before audit was enabled', async () 
     assert.equal(result.inserted, 1);
     assert.equal(result.discarded, 1);
     assert.equal(inserted[0].destination, 'after.example.com');
+    assert.equal(inserted[0].originalDestination, '203.0.113.20');
+    assert.equal(inserted[0].originalDestinationType, 'IPV4');
+    assert.equal(inserted[0].originalNetwork, 'tcp');
+    assert.equal(inserted[0].originalPort, 443);
+    assert.equal(inserted[0].sniffedProtocol, 'tls');
     assert.equal(userQuery.where.OR.some((condition) => condition.uuid), false);
 });
 
@@ -442,12 +452,29 @@ test(
                     requestedAt: new Date(now),
                     clientIdentifier: 'integration-user',
                 },
+                {
+                    eventId: randomUUID(),
+                    userId: 1n,
+                    userUuid,
+                    nodeUuid,
+                    destination: 'sniffed.integration.example.com',
+                    destinationType: 'DOMAIN',
+                    network: 'udp',
+                    port: 443,
+                    originalDestination: '203.0.113.20',
+                    originalDestinationType: 'IPV4',
+                    originalNetwork: 'udp',
+                    originalPort: 443,
+                    sniffedProtocol: 'quic',
+                    requestedAt: new Date(now + 1_000),
+                    clientIdentifier: 'integration-user',
+                },
             ]);
 
             const page = await clickhouse.getUserLogs({ userUuid, limit: 1 });
 
             assert.equal(page.items.length, 1);
-            assert.equal(page.items[0].destination, 'keep.other.test');
+            assert.equal(page.items[0].destination, 'sniffed.integration.example.com');
             assert.ok(page.nextCursor);
 
             const secondPage = await clickhouse.getUserLogs({
@@ -455,7 +482,7 @@ test(
                 limit: 1,
                 cursor: page.nextCursor,
             });
-            assert.equal(secondPage.items[0].destination, 'sub.noise.example.com');
+            assert.equal(secondPage.items[0].destination, 'keep.other.test');
 
             const filtered = await clickhouse.getUserLogs({
                 userUuid,
@@ -497,6 +524,38 @@ test(
                 false,
             );
 
+            const rawExtendedResult = await clickhouse.client.query({
+                query: `
+                    SELECT
+                        destination,
+                        original_destination,
+                        original_destination_type,
+                        original_network,
+                        original_port,
+                        sniffed_protocol
+                    FROM traffic_logs FINAL
+                    WHERE user_uuid = {userUuid:UUID}
+                    ORDER BY requested_at ASC
+                `,
+                query_params: { userUuid },
+                format: 'JSONEachRow',
+            });
+            const rawExtendedRows = await rawExtendedResult.json();
+            const oldStoredRow = rawExtendedRows.find(
+                (row) => row.destination === 'integration.example.com',
+            );
+            const extendedStoredRow = rawExtendedRows.find(
+                (row) => row.destination === 'sniffed.integration.example.com',
+            );
+
+            assert.equal(oldStoredRow.original_destination, null);
+            assert.equal(oldStoredRow.sniffed_protocol, null);
+            assert.equal(extendedStoredRow.original_destination, '203.0.113.20');
+            assert.equal(extendedStoredRow.original_destination_type, 'IPV4');
+            assert.equal(extendedStoredRow.original_network, 'udp');
+            assert.equal(extendedStoredRow.original_port, 443);
+            assert.equal(extendedStoredRow.sniffed_protocol, 'quic');
+
             const definitionResult = await clickhouse.client.query({
                 query: `SHOW CREATE TABLE traffic_logs`,
                 format: 'JSONEachRow',
@@ -504,6 +563,11 @@ test(
             const [definition] = await definitionResult.json();
 
             assert.match(definition.statement, /TTL requested_at \+ toIntervalDay\(30\)/);
+            assert.match(
+                definition.statement,
+                /`original_destination` Nullable\(String\) DEFAULT NULL/,
+            );
+            assert.match(definition.statement, /`sniffed_protocol` Nullable\(String\) DEFAULT NULL/);
         } finally {
             await clickhouse.onModuleDestroy();
         }
