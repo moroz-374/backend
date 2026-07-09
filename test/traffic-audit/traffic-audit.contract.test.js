@@ -193,6 +193,100 @@ test('node provisioning contracts require a one-time traffic audit credential', 
     assert.equal('nodeUuid' in ingestTrafficLogsSchema.shape, false);
 });
 
+test('ingest payload schema accepts old and versioned extended traffic audit events', () => {
+    const oldPayload = ingestTrafficLogsSchema.parse({
+        events: [
+            {
+                eventId: randomUUID(),
+                clientIdentifier: 'audit-user',
+                destination: 'Legacy.Example.COM.',
+                destinationType: 'DOMAIN',
+                network: 'tcp',
+                port: 443,
+                requestedAt: '2026-07-08T12:00:00.000Z',
+            },
+        ],
+        metrics: {
+            queueDepth: 0,
+            droppedEventsTotal: 0,
+            retryAttemptsTotal: 0,
+            lastSuccessfulDeliveryAt: null,
+        },
+    });
+
+    assert.equal(oldPayload.schemaVersion, 1);
+    assert.equal(oldPayload.events[0].destination, 'legacy.example.com');
+
+    const extendedPayload = ingestTrafficLogsSchema.parse({
+        schemaVersion: 2,
+        events: [
+            {
+                eventId: randomUUID(),
+                clientIdentifier: 'audit-user',
+                destination: 'Sniffed.Example.COM.',
+                destinationType: 'DOMAIN',
+                network: 'udp',
+                port: 443,
+                originalDestination: '203.0.113.20',
+                originalDestinationType: 'IPV4',
+                originalNetwork: 'udp',
+                originalPort: 443,
+                sniffedProtocol: 'quic',
+                requestedAt: '2026-07-08T12:00:01.000Z',
+            },
+        ],
+        metrics: {
+            queueDepth: 0,
+            droppedEventsTotal: 0,
+            retryAttemptsTotal: 0,
+            lastSuccessfulDeliveryAt: 1_783_516_801_000,
+        },
+    });
+
+    assert.equal(extendedPayload.schemaVersion, 2);
+    assert.equal(extendedPayload.events[0].destination, 'sniffed.example.com');
+    assert.equal(extendedPayload.events[0].originalDestination, '203.0.113.20');
+    assert.equal(extendedPayload.events[0].sniffedProtocol, 'quic');
+
+    assert.equal(
+        ingestTrafficLogsSchema.safeParse({
+            schemaVersion: 3,
+            events: oldPayload.events,
+            metrics: oldPayload.metrics,
+        }).success,
+        false,
+    );
+    assert.equal(
+        ingestTrafficLogsSchema.safeParse({
+            schemaVersion: 2,
+            events: [
+                {
+                    ...oldPayload.events[0],
+                    originalDestination: 'a'.repeat(254),
+                    sniffedProtocol: 'made-up-sniffer',
+                },
+            ],
+            metrics: oldPayload.metrics,
+        }).success,
+        false,
+    );
+    assert.equal(
+        ingestTrafficLogsSchema.safeParse({
+            schemaVersion: 2,
+            events: [
+                {
+                    ...oldPayload.events[0],
+                    originalDestination: '203.0.113.20',
+                    originalDestinationType: 'IPV4',
+                    sniffedProtocol: 'tls',
+                },
+            ],
+            metrics: oldPayload.metrics,
+        }).success,
+        false,
+    );
+});
+
 test('hide rules normalize domains and validate whole-string globs', () => {
     const settings = TrafficAuditSettingsSchema.parse({
         hideRules: [
