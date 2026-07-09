@@ -115,7 +115,7 @@ services:
       XRAY_ACCESS_LOG_PATH: /var/log/xray/access.log
       TRAFFIC_AUDIT_BACKEND_URL: http://ingest-proxy:8080
       TRAFFIC_AUDIT_FLUSH_INTERVAL_MS: 500
-      TRAFFIC_AUDIT_QUEUE_MAX_SIZE: 3
+      TRAFFIC_AUDIT_QUEUE_MAX_SIZE: 8
       TRAFFIC_AUDIT_REQUEST_TIMEOUT_MS: 1000
       TRAFFIC_AUDIT_BACKOFF_INITIAL_MS: 200
       TRAFFIC_AUDIT_BACKOFF_MAX_MS: 1000
@@ -154,6 +154,7 @@ services:
       default:
         aliases:
           - traffic-audit-target
+          - http.fixture.test
     healthcheck:
       test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080]
       interval: 2s

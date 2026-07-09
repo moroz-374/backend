@@ -136,6 +136,11 @@ const serverConfig = {
                     { id: '10000000-0000-4000-8000-000000000003', email: users.preEnable.username },
                 ],
             },
+            sniffing: {
+                enabled: true,
+                destOverride: ['http', 'tls', 'quic'],
+                logSniffedDestination: true,
+            },
         },
     ],
     outbounds: [{ tag: 'direct', protocol: 'freedom' }],
@@ -162,16 +167,16 @@ async function startXray(forceRestart = false) {
     assert.equal(body.response.isStarted, true, text);
 }
 
-async function tcpViaSocks(port) {
+async function tcpViaSocks(port, { resolveLocally = false, target = 'traffic-audit-target' } = {}) {
     const body = run('curl', [
         '--fail',
         '--silent',
         '--show-error',
         '--max-time',
         '10',
-        '--socks5-hostname',
+        resolveLocally ? '--socks5' : '--socks5-hostname',
         `xray-client:${port}`,
-        'http://traffic-audit-target:8080/',
+        `http://${target}:8080/`,
     ]);
     assert.match(body, /traffic-audit-e2e/);
 }
@@ -192,6 +197,21 @@ async function udpViaXray() {
     } finally {
         socket.close();
     }
+}
+
+function xrayTimestamp(date = new Date()) {
+    return date.toISOString().replace('T', ' ').replace(/[-:]/g, (value, offset) => {
+        if (offset === 4 || offset === 7) return '/';
+        return value;
+    }).replace(/\.\d{3}Z$/, '.000000');
+}
+
+function appendAccessLogFixtures(lines) {
+    run(
+        'docker',
+        ['exec', '-i', nodeContainer, 'sh', '-c', 'cat >> /var/log/xray/access.log'],
+        { input: `${lines.join('\n')}\n` },
+    );
 }
 
 async function logs(user, query = '') {
@@ -277,6 +297,94 @@ await tcpViaSocks(1081);
 await udpViaXray();
 await waitFor(async () => (await logs(users.enabled)).items.length >= disabledCount + 2, 'TCP/UDP events were not ingested');
 
+console.log('Checking HTTP sniffing keeps original IP and stores the confirmed domain...');
+await tcpViaSocks(1081, { resolveLocally: true, target: 'http.fixture.test' });
+const sniffedHttpEvent = await waitFor(async () => {
+    const event = (await logs(users.enabled, 'destination=http.fixture.test')).items.find(
+        (item) => item.destination === 'http.fixture.test',
+    );
+    return event?.originalDestination ? event : null;
+}, 'HTTP sniffed destination was not ingested');
+assert.equal(sniffedHttpEvent.destinationType, 'DOMAIN');
+assert.equal(sniffedHttpEvent.network, 'tcp');
+assert.equal(sniffedHttpEvent.port, 8080);
+assert.equal(sniffedHttpEvent.originalDestinationType, 'IPV4');
+assert.equal(sniffedHttpEvent.sniffedProtocol, 'http');
+
+console.log('Checking TLS, QUIC, FakeDNS, IPv6 and unknown enrichment fixtures through the live pipeline...');
+const fixtureTimestamp = xrayTimestamp();
+appendAccessLogFixtures([
+    `${fixtureTimestamp} from 172.18.0.10:41001 accepted tcp:tls.fixture.test:443 [vless-in >> direct] email: audit-enabled original: tcp:203.0.113.20:443 sniffed: tls`,
+    `${fixtureTimestamp} from 172.18.0.10:41002 accepted udp:quic.fixture.test:443 [vless-in >> direct] email: audit-enabled original: udp:[2001:db8:1::20]:443 sniffed: quic`,
+    `${fixtureTimestamp} from 172.18.0.10:41003 accepted tcp:fakedns.fixture.test:443 [vless-in >> direct] email: audit-enabled original: tcp:198.18.0.42:443 sniffed: fakedns`,
+    `${fixtureTimestamp} from 172.18.0.10:41004 accepted tcp:unknown:8443 [vless-in >> direct] email: audit-enabled`,
+]);
+const fixtureEvents = await waitFor(async () => {
+    const items = (await logs(users.enabled, 'limit=20')).items;
+    const byDestination = new Map(items.map((item) => [item.destination, item]));
+    return ['tls.fixture.test', 'quic.fixture.test', 'fakedns.fixture.test', 'unknown'].every((destination) =>
+        byDestination.has(destination),
+    )
+        ? byDestination
+        : null;
+}, 'enrichment fixtures were not ingested');
+assert.deepEqual(
+    fixtureEvents.get('tls.fixture.test'),
+    {
+        ...fixtureEvents.get('tls.fixture.test'),
+        destination: 'tls.fixture.test',
+        destinationType: 'DOMAIN',
+        network: 'tcp',
+        port: 443,
+        originalDestination: '203.0.113.20',
+        originalDestinationType: 'IPV4',
+        sniffedProtocol: 'tls',
+        nodeUuid,
+    },
+);
+assert.deepEqual(
+    fixtureEvents.get('quic.fixture.test'),
+    {
+        ...fixtureEvents.get('quic.fixture.test'),
+        destination: 'quic.fixture.test',
+        destinationType: 'DOMAIN',
+        network: 'udp',
+        port: 443,
+        originalDestination: '2001:db8:1::20',
+        originalDestinationType: 'IPV6',
+        sniffedProtocol: 'quic',
+        nodeUuid,
+    },
+);
+assert.deepEqual(
+    fixtureEvents.get('fakedns.fixture.test'),
+    {
+        ...fixtureEvents.get('fakedns.fixture.test'),
+        destination: 'fakedns.fixture.test',
+        destinationType: 'DOMAIN',
+        network: 'tcp',
+        port: 443,
+        originalDestination: '198.18.0.42',
+        originalDestinationType: 'IPV4',
+        sniffedProtocol: 'fakedns',
+        nodeUuid,
+    },
+);
+assert.deepEqual(
+    fixtureEvents.get('unknown'),
+    {
+        ...fixtureEvents.get('unknown'),
+        destination: 'unknown',
+        destinationType: 'UNKNOWN',
+        network: 'tcp',
+        port: 8443,
+        originalDestination: null,
+        originalDestinationType: null,
+        sniffedProtocol: null,
+        nodeUuid,
+    },
+);
+
 console.log('Checking delayed pre-enable discard and sender retry/backoff...');
 await setProxy('fail');
 const beforeFailure = await proxyStats();
@@ -299,7 +407,7 @@ assert.ok(udpOnly.items.length >= 1);
 await api(`/api/users/${users.enabled.uuid}/traffic-audit/logs?cursor=not-a-cursor`, {}, 400);
 await api(`/api/users/${users.enabled.uuid}/traffic-audit/logs?port=0`, {}, 400);
 await api(`/api/users/${users.enabled.uuid}/traffic-audit/logs?from=2026-06-29T00:00:00.000Z&to=2026-06-28T00:00:00.000Z`, {}, 400);
-sql(`UPDATE remnawave_settings SET traffic_audit_settings = '{"hideRules":[{"type":"EXACT","pattern":"traffic-audit-target"}]}'::jsonb`);
+sql(`UPDATE remnawave_settings SET traffic_audit_settings = '{"hideRules":[{"type":"EXACT","pattern":"traffic-audit-target"},{"type":"EXACT","pattern":"http.fixture.test"},{"type":"EXACT","pattern":"tls.fixture.test"},{"type":"EXACT","pattern":"quic.fixture.test"},{"type":"EXACT","pattern":"fakedns.fixture.test"},{"type":"EXACT","pattern":"unknown"}]}'::jsonb`);
 assert.equal((await logs(users.enabled)).items.length, 0);
 sql(`UPDATE remnawave_settings SET traffic_audit_settings = '{"hideRules":[]}'::jsonb`);
 
@@ -360,7 +468,7 @@ await tcpViaSocks(1081);
 await waitFor(async () => (await logs(users.enabled)).items.length > beforeRotation, 'rotated log event missing');
 
 await setProxy('fail');
-for (let index = 0; index < 8; index += 1) await tcpViaSocks(1081);
+for (let index = 0; index < 12; index += 1) await tcpViaSocks(1081);
 await new Promise((resolve) => setTimeout(resolve, 2_000));
 await setProxy('pass');
 await tcpViaSocks(1081);
