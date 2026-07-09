@@ -25,6 +25,7 @@ const {
 } = require('../../dist/src/modules/traffic-audit/traffic-audit.service');
 const {
     getTrafficLogsSchema,
+    getTrafficLogsResponseSchema,
 } = require('../../dist/src/modules/traffic-audit/dtos/get-traffic-logs.dto');
 const {
     TrafficAuditSettingsSchema,
@@ -475,7 +476,16 @@ test(
 
             assert.equal(page.items.length, 1);
             assert.equal(page.items[0].destination, 'sniffed.integration.example.com');
+            assert.equal(page.items[0].originalDestination, '203.0.113.20');
+            assert.equal(page.items[0].originalDestinationType, 'IPV4');
+            assert.equal(page.items[0].sniffedProtocol, 'quic');
             assert.ok(page.nextCursor);
+            assert.equal(
+                getTrafficLogsResponseSchema.safeParse({
+                    response: page,
+                }).success,
+                true,
+            );
 
             const secondPage = await clickhouse.getUserLogs({
                 userUuid,
@@ -483,6 +493,9 @@ test(
                 cursor: page.nextCursor,
             });
             assert.equal(secondPage.items[0].destination, 'keep.other.test');
+            assert.equal(secondPage.items[0].originalDestination, null);
+            assert.equal(secondPage.items[0].originalDestinationType, null);
+            assert.equal(secondPage.items[0].sniffedProtocol, null);
 
             const filtered = await clickhouse.getUserLogs({
                 userUuid,

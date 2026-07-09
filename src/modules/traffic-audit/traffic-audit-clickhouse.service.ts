@@ -30,6 +30,9 @@ export interface TrafficAuditRow {
     network: 'tcp' | 'udp';
     nodeUuid: string;
     port: number;
+    originalDestination: string | null;
+    originalDestinationType: 'DOMAIN' | 'IPV4' | 'IPV6' | 'UNKNOWN' | null;
+    sniffedProtocol: 'http' | 'tls' | 'quic' | 'fakedns' | 'fakedns+others' | null;
     requestedAtMs: string;
 }
 
@@ -175,6 +178,9 @@ export class TrafficAuditClickhouseService implements OnModuleDestroy, OnModuleI
                     destination_type AS destinationType,
                     network,
                     port,
+                    original_destination AS originalDestination,
+                    original_destination_type AS originalDestinationType,
+                    sniffed_protocol AS sniffedProtocol,
                     toString(toUnixTimestamp64Milli(requested_at)) AS requestedAtMs,
                     toString(node_uuid) AS nodeUuid
                 FROM traffic_logs FINAL
