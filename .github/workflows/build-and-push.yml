@@ -6,7 +6,7 @@ on:
       version:
         description: Version from release/release-contract.json
         required: true
-        default: 2.7.4-traffic-audit.3
+        default: 2.7.4-traffic-audit.7
         type: string
       frontend_ref:
         description: Frontend branch, tag, or commit to include
