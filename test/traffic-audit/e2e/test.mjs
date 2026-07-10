@@ -385,6 +385,40 @@ assert.deepEqual(
     },
 );
 
+console.log('Checking privacy fallbacks remain IP-only through the live pipeline...');
+const privacyFixtures = [
+    { scenario: 'ECH without observable inner name', destination: '203.0.113.101', network: 'tcp', port: 443 },
+    { scenario: 'TLS without SNI', destination: '203.0.113.102', network: 'tcp', port: 443 },
+    { scenario: 'encrypted DNS', destination: '203.0.113.103', network: 'tcp', port: 853 },
+    { scenario: 'shared CDN IP', destination: '203.0.113.104', network: 'tcp', port: 443 },
+    { scenario: 'malformed QUIC', destination: '203.0.113.105', network: 'udp', port: 443 },
+];
+const privacyTimestamp = xrayTimestamp();
+appendAccessLogFixtures(
+    privacyFixtures.map(
+        ({ destination, network, port }, index) =>
+            `${privacyTimestamp} from 172.18.0.10:${42001 + index} accepted ${network}:${destination}:${port} [vless-in >> direct] email: audit-enabled`,
+    ),
+);
+const privacyEvents = await waitFor(async () => {
+    const byDestination = new Map((await logs(users.enabled, 'limit=100')).items.map((item) => [item.destination, item]));
+    return privacyFixtures.every(({ destination }) => byDestination.has(destination)) ? byDestination : null;
+}, 'privacy fallback fixtures were not ingested');
+for (const fixture of privacyFixtures) {
+    const event = privacyEvents.get(fixture.destination);
+    assert.deepEqual(event, {
+        ...event,
+        destination: fixture.destination,
+        destinationType: 'IPV4',
+        network: fixture.network,
+        port: fixture.port,
+        originalDestination: null,
+        originalDestinationType: null,
+        sniffedProtocol: null,
+        nodeUuid,
+    }, `${fixture.scenario} must stay IP-only without inferred domain enrichment`);
+}
+
 console.log('Checking delayed pre-enable discard and sender retry/backoff...');
 await setProxy('fail');
 const beforeFailure = await proxyStats();
@@ -407,7 +441,7 @@ assert.ok(udpOnly.items.length >= 1);
 await api(`/api/users/${users.enabled.uuid}/traffic-audit/logs?cursor=not-a-cursor`, {}, 400);
 await api(`/api/users/${users.enabled.uuid}/traffic-audit/logs?port=0`, {}, 400);
 await api(`/api/users/${users.enabled.uuid}/traffic-audit/logs?from=2026-06-29T00:00:00.000Z&to=2026-06-28T00:00:00.000Z`, {}, 400);
-sql(`UPDATE remnawave_settings SET traffic_audit_settings = '{"hideRules":[{"type":"EXACT","pattern":"traffic-audit-target"},{"type":"EXACT","pattern":"http.fixture.test"},{"type":"EXACT","pattern":"tls.fixture.test"},{"type":"EXACT","pattern":"quic.fixture.test"},{"type":"EXACT","pattern":"fakedns.fixture.test"},{"type":"EXACT","pattern":"unknown"}]}'::jsonb`);
+sql(`UPDATE remnawave_settings SET traffic_audit_settings = '{"hideRules":[{"type":"EXACT","pattern":"traffic-audit-target"},{"type":"EXACT","pattern":"http.fixture.test"},{"type":"EXACT","pattern":"tls.fixture.test"},{"type":"EXACT","pattern":"quic.fixture.test"},{"type":"EXACT","pattern":"fakedns.fixture.test"},{"type":"EXACT","pattern":"unknown"},{"type":"EXACT","pattern":"203.0.113.101"},{"type":"EXACT","pattern":"203.0.113.102"},{"type":"EXACT","pattern":"203.0.113.103"},{"type":"EXACT","pattern":"203.0.113.104"},{"type":"EXACT","pattern":"203.0.113.105"}]}'::jsonb`);
 assert.equal((await logs(users.enabled)).items.length, 0);
 sql(`UPDATE remnawave_settings SET traffic_audit_settings = '{"hideRules":[]}'::jsonb`);
 
